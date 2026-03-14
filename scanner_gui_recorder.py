@@ -20,6 +20,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QAction, QActionGroup, QIcon
 from PySide6.QtCore import Signal, QTimer
 
+from streaming_support import StreamingManager
+from scanner_web_server import MetadataWebServer
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = r"C:\DSDPlusFastlane\startup\fmp24_scan.log"
 OUTPUT_DIR = r"C:\DSDPlusFastlane\recordings"
@@ -27,6 +30,8 @@ LOCAL_FFMPEG_DIR = os.path.join(SCRIPT_DIR, "ffmpeg")
 LOCAL_FFMPEG_EXE = os.path.join(LOCAL_FFMPEG_DIR, "ffmpeg.exe")
 RECORDINGS_LOG_FILE = os.path.join(OUTPUT_DIR, "recordings_log.json")
 SETTINGS_FILE = os.path.join(SCRIPT_DIR, "scanner_gui_recorder_settings.json")
+ICON_FILE = os.path.join(SCRIPT_DIR, "app.ico")
+WEB_UI_PORT = 8890
 
 POLL_INTERVAL_SEC = 0.02
 LOG_POLL_SEC = 0.05
@@ -128,6 +133,7 @@ DEFAULT_SETTINGS = {
     "minimize_to_tray": True,
     "audio_device_name": "",
     "audio_device_index": None,
+    "streaming_enabled": False,
 }
 
 
@@ -138,19 +144,36 @@ class RecorderGUI(QWidget):
     recording_update = Signal(str)
     meter_update = Signal(int)
     button_mode_update = Signal(bool)
+    stream_status_update = Signal(str)
+    stream_url_update = Signal(str)
+    web_url_update = Signal(str)
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle("DSDPlus Scanner Recorder")
         self.setStyleSheet(APP_STYLE)
+        self.app_icon = self.load_app_icon()
+        if not self.app_icon.isNull():
+            self.setWindowIcon(self.app_icon)
 
         self.monitor_thread = None
+        self.current_status_value = "STOPPED"
+        self.current_recording_value = "OFF"
+        self.current_stream_status_value = "OFF"
         self.current_metadata = None
         self.current_log_line = None
         self.finalizer_threads = []
         self.metadata_lock = threading.Lock()
         self.allow_close = False
         self.settings = self.load_settings()
+        self.streaming_manager = StreamingManager(
+            SCRIPT_DIR,
+            LOCAL_FFMPEG_DIR,
+            self.log_message.emit,
+            self.stream_status_update.emit,
+            self.stream_url_update.emit,
+        )
+        self.web_server = MetadataWebServer("0.0.0.0", WEB_UI_PORT, self.build_web_payload)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(14, 14, 14, 14)
@@ -214,6 +237,32 @@ class RecorderGUI(QWidget):
         self.device_value = QLabel("Not selected")
         self.device_value.setObjectName("statusValue")
         middle_layout.addWidget(self.device_value)
+
+        stream_title = QLabel("Live Stream")
+        stream_title.setObjectName("sectionLabel")
+        middle_layout.addWidget(stream_title)
+
+        self.stream_status = QLabel("OFF")
+        self.stream_status.setObjectName("statusValue")
+        middle_layout.addWidget(self.stream_status)
+
+        stream_url_title = QLabel("WebRTC URL")
+        stream_url_title.setObjectName("sectionLabel")
+        middle_layout.addWidget(stream_url_title)
+
+        self.stream_url_value = QLabel("Streaming disabled")
+        self.stream_url_value.setObjectName("statusValue")
+        self.stream_url_value.setWordWrap(True)
+        middle_layout.addWidget(self.stream_url_value)
+
+        web_title = QLabel("Web Player URL")
+        web_title.setObjectName("sectionLabel")
+        middle_layout.addWidget(web_title)
+
+        self.web_url_value = QLabel("Starting web UI...")
+        self.web_url_value.setObjectName("statusValue")
+        self.web_url_value.setWordWrap(True)
+        middle_layout.addWidget(self.web_url_value)
         layout.addWidget(middle_card)
 
         log_card = QFrame()
@@ -239,6 +288,9 @@ class RecorderGUI(QWidget):
         self.recording_update.connect(self.set_recording_state)
         self.meter_update.connect(self.audio_meter.setValue)
         self.button_mode_update.connect(self.set_monitor_button_mode)
+        self.stream_status_update.connect(self.set_stream_status_text)
+        self.stream_url_update.connect(self.set_stream_url_text)
+        self.web_url_update.connect(self.set_web_url_text)
 
         self.options_menu = QMenu(self)
         self.options_menu.aboutToShow.connect(self.rebuild_options_menu)
@@ -248,9 +300,55 @@ class RecorderGUI(QWidget):
         self.set_recording_state("Recording: OFF")
         self.set_monitor_button_mode(False)
         self.update_device_label()
+        self.refresh_stream_labels()
+        self.start_web_server()
 
         if self.settings.get("auto_start_on_open"):
             QTimer.singleShot(0, self.start_monitor)
+
+    def get_web_player_url(self):
+        return f"http://{self.streaming_manager.get_webrtc_url().split('//', 1)[1].split(':', 1)[0]}:{WEB_UI_PORT}/"
+
+    def build_web_payload(self):
+        metadata = self.get_current_metadata()
+        return {
+            "status": self.current_status_value,
+            "recording": self.current_recording_value == "ON",
+            "stream_status": self.current_stream_status_value,
+            "streaming_enabled": bool(self.settings.get("streaming_enabled")),
+            "display": metadata.get("display", "Unknown Channel"),
+            "frequency": metadata.get("frequency", "unknown"),
+            "mode": metadata.get("mode", "unknown"),
+            "label": metadata.get("label", "Unknown_Channel"),
+            "raw_log_line": metadata.get("raw", ""),
+            "audio_device": self.device_value.text(),
+            "raw_stream_url": self.streaming_manager.get_webrtc_url(),
+            "web_player_url": self.get_web_player_url(),
+            "updated_at": datetime.now().strftime("%H:%M:%S"),
+        }
+
+    def start_web_server(self):
+        try:
+            self.web_server.start()
+            self.web_url_update.emit(self.get_web_player_url())
+            self.log_message.emit(f"Scanner web UI -> {self.get_web_player_url()}")
+        except OSError as exc:
+            self.web_url_update.emit(f"Web UI failed: {exc}")
+            self.log_message.emit(f"Web UI failed: {exc}")
+
+    def load_app_icon(self):
+        if os.path.exists(ICON_FILE):
+            return QIcon(ICON_FILE)
+        return QIcon()
+
+    def refresh_stream_labels(self):
+        self.web_url_update.emit(self.get_web_player_url())
+        if self.settings.get("streaming_enabled"):
+            self.stream_status_update.emit("READY")
+            self.stream_url_update.emit(self.streaming_manager.get_webrtc_url())
+        else:
+            self.stream_status_update.emit("OFF")
+            self.stream_url_update.emit("Streaming disabled")
 
     def load_settings(self):
         settings = dict(DEFAULT_SETTINGS)
@@ -318,6 +416,12 @@ class RecorderGUI(QWidget):
         tray_action.triggered.connect(lambda checked: self.update_setting("minimize_to_tray", checked))
         self.options_menu.addAction(tray_action)
 
+        streaming_action = QAction("Enable Live Streaming", self)
+        streaming_action.setCheckable(True)
+        streaming_action.setChecked(bool(self.settings.get("streaming_enabled", False)))
+        streaming_action.triggered.connect(lambda checked: self.update_setting("streaming_enabled", checked))
+        self.options_menu.addAction(streaming_action)
+
         self.options_menu.addSeparator()
 
         refresh_action = QAction("Refresh Audio Devices", self)
@@ -345,6 +449,12 @@ class RecorderGUI(QWidget):
     def update_setting(self, key, value):
         self.settings[key] = value
         self.save_settings()
+        if key == "streaming_enabled":
+            self.refresh_stream_labels()
+            if value:
+                self.log_message.emit(f"Live streaming enabled -> {self.streaming_manager.get_webrtc_url()}")
+            else:
+                self.log_message.emit("Live streaming disabled")
 
     def refresh_devices(self):
         self.update_device_label()
@@ -366,7 +476,7 @@ class RecorderGUI(QWidget):
             json.dump(data, f, indent=2)
 
     def create_tray(self):
-        self.tray = QSystemTrayIcon(self)
+        self.tray = QSystemTrayIcon(self.app_icon, self)
         menu = QMenu()
         show_action = QAction("Show", self)
         quit_action = QAction("Quit", self)
@@ -385,6 +495,7 @@ class RecorderGUI(QWidget):
     def quit_app(self):
         self.allow_close = True
         self.stop_monitor()
+        self.web_server.stop()
         QApplication.instance().quit()
 
     def closeEvent(self, event):
@@ -400,14 +511,26 @@ class RecorderGUI(QWidget):
         scrollbar.setValue(scrollbar.maximum())
 
     def set_status_text(self, text):
-        self.status.setText(text.replace("Status:", "").strip().upper())
+        self.current_status_value = text.replace("Status:", "").strip().upper()
+        self.status.setText(self.current_status_value)
+
+    def set_stream_status_text(self, text):
+        self.current_stream_status_value = text.strip().upper()
+        self.stream_status.setText(self.current_stream_status_value)
+
+    def set_stream_url_text(self, text):
+        self.stream_url_value.setText(text)
+
+    def set_web_url_text(self, text):
+        self.web_url_value.setText(text)
 
     def set_channel_display(self, text):
         value = text.replace("Channel:", "").strip()
         self.channel.setText(value or "---")
 
     def set_recording_state(self, text):
-        is_recording = text.replace("Recording:", "").strip().upper() == "ON"
+        self.current_recording_value = text.replace("Recording:", "").strip().upper()
+        is_recording = self.current_recording_value == "ON"
         self.recording_light.setStyleSheet(LIGHT_RECORD_STYLE if is_recording else LIGHT_IDLE_STYLE)
         self.channel.setStyleSheet(LCD_RECORD_STYLE if is_recording else LCD_IDLE_STYLE)
 
@@ -435,12 +558,15 @@ class RecorderGUI(QWidget):
         self.recording_update.emit("Recording: OFF")
         self.button_mode_update.emit(True)
         self.update_device_label()
+        self.refresh_stream_labels()
         self.log_message.emit(f"Watching {LOG_FILE}")
         self.log_message.emit(f"Audio trigger level: {AUDIO_TRIGGER_LEVEL:.4f}, silence hang: {SILENCE_HANG_SEC:.2f}s")
         if os.path.exists(LOCAL_FFMPEG_EXE):
             self.log_message.emit(f"Using local ffmpeg for MP3 conversion: {LOCAL_FFMPEG_EXE}")
         else:
             self.log_message.emit("ffmpeg not found; recordings will stay as WAV files")
+        if self.settings.get("streaming_enabled"):
+            self.log_message.emit(f"Live WebRTC URL -> {self.streaming_manager.get_webrtc_url()}")
         self.monitor_thread = threading.Thread(target=self.monitor_audio, daemon=True)
         self.monitor_thread.start()
 
@@ -448,11 +574,13 @@ class RecorderGUI(QWidget):
         global running
         was_running = running
         running = False
+        self.streaming_manager.stop(log_message=False)
         self.status_update.emit("Status: STOPPED")
         self.recording_update.emit("Recording: OFF")
         self.channel_update.emit("Channel: ---")
         self.meter_update.emit(0)
         self.button_mode_update.emit(False)
+        self.refresh_stream_labels()
         if was_running:
             self.log_message.emit("Monitoring stopped")
 
@@ -616,6 +744,8 @@ class RecorderGUI(QWidget):
             self.status_update.emit("Status: ERROR")
             self.button_mode_update.emit(False)
             return
+        if self.settings.get("streaming_enabled"):
+            self.streaming_manager.start(samplerate)
         self.log_message.emit(f"Monitoring audio on {device_name}")
         while running:
             now = time.monotonic()
@@ -635,6 +765,8 @@ class RecorderGUI(QWidget):
             if overflowed:
                 self.log_message.emit("Audio overflow detected")
             self.meter_update.emit(int(min(level * 2400, 100)))
+            if self.settings.get("streaming_enabled"):
+                self.streaming_manager.write(data)
             if active_session:
                 active_session["wave_file"].writeframes(data)
                 if level >= AUDIO_TRIGGER_LEVEL:
@@ -657,11 +789,13 @@ class RecorderGUI(QWidget):
             stream.close()
         except Exception:
             pass
+        self.streaming_manager.stop(log_message=False)
         if active_session:
             self.stop_audio_session(active_session, "Monitoring stopped")
         self.meter_update.emit(0)
         self.recording_update.emit("Recording: OFF")
         self.button_mode_update.emit(False)
+        self.refresh_stream_labels()
         if not running:
             self.status_update.emit("Status: STOPPED")
 
