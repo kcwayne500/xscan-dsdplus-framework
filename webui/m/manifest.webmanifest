@@ -1,0 +1,25 @@
+﻿{
+  "name": "Scanner Mobile",
+  "short_name": "Scanner",
+  "description": "Mobile-first scanner audio playback with live stream and recent call replay.",
+  "start_url": "/m/",
+  "scope": "/m/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08111a",
+  "theme_color": "#08111a",
+  "icons": [
+    {
+      "src": "/m/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/m/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

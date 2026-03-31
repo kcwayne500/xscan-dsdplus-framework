@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Scanner Radio</title>
+    <style>
+        @font-face {
+            font-family: 'PixelSplitter';
+            font-style: normal;
+            font-display: swap;
+            font-weight: 700;
+            src: url('/fonts/PixelSplitter-Bold.ttf') format('truetype')
+        }
+        :root {
+            --bg: #11161c;
+            --panel: #1a212b;
+            --panel2: #202936;
+            --line: #334155;
+            --muted: #94a3b8;
+            --text: #e5edf5;
+            --lcd: #d7e2af;
+            --lcdfg: #1f2916;
+            --lcdb: #95a46c;
+            --ok: #22c55e;
+            --warn: #f59e0b;
+            --bad: #f87171;
+            --accent: #93c5fd;
+        }
+        * { box-sizing: border-box }
+        body {
+            margin: 0;
+            background: radial-gradient(circle at top, #1b2430 0%, var(--bg) 60%);
+            color: var(--text);
+            font-family: "Segoe UI", Tahoma, sans-serif;
+        }
+        .shell { max-width: 1080px; margin: 0 auto; padding: 18px }
+        .topnav, .lcdtop, .lcdbottom, .decktop, .controls, .footer, .metarow, .timelinehead, .timelinelegend, .callmeta, .sidecard .stack {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .topnav { align-items: center; margin-bottom: 14px }
+        .navtitle, .label, .tinylabel {
+            font-size: 11px;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        .navlinks, .lcdchips, .sidepanel { display: flex; gap: 10px; flex-wrap: wrap }
+        .sidepanel { flex-direction: column; gap: 14px }
+        .pagelink, .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            color: var(--text);
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            background: linear-gradient(180deg, #243244, #18222f);
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .pagelink.active, .btn.live { background: linear-gradient(180deg, #1f4f38, #163928); border-color: #3d8b65 }
+        .btn { appearance: none; cursor: pointer; min-width: 86px }
+        .btn.secondary { min-width: 62px }
+        .btn.is-active { box-shadow: 0 0 0 1px rgba(61, 139, 101, .25), 0 0 18px rgba(34, 197, 94, .12) }
+        .btn.is-paused { background: linear-gradient(180deg, #5b4620, #3f2f13); border-color: #9a7a2a; color: #fff0c2 }
+        .btn.is-muted { background: linear-gradient(180deg, #4a2231, #321722); border-color: #9d4b6b; color: #ffd8e6 }
+        .btn:disabled { opacity: .55; cursor: not-allowed }
+        .card, .deck, .sidecard, .timeline, .metabox, .playbackbadge, .vol, .audiomonitor {
+            border: 1px solid var(--line);
+            background: linear-gradient(180deg, var(--panel2), var(--panel));
+            border-radius: 16px;
+        }
+        .card { padding: 14px 16px; box-shadow: 0 14px 34px rgba(0, 0, 0, .28) }
+        .deck {
+            padding: 14px;
+            border-radius: 18px;
+            background: radial-gradient(circle at top left, rgba(147, 197, 253, .08), transparent 35%), linear-gradient(180deg, #10161f, #0c1118);
+        }
+        .lcdshell {
+            background: linear-gradient(180deg, #dfe8bb, var(--lcd));
+            color: var(--lcdfg);
+            border: 3px solid var(--lcdb);
+            border-radius: 20px;
+            padding: 14px 18px 16px;
+            box-shadow: inset 0 2px 8px rgba(255, 255, 255, .16), inset 0 -6px 14px rgba(112, 129, 66, .18);
+            margin-bottom: 14px;
+        }
+        .lcdshell.recording { background: linear-gradient(180deg, #e6b6aa, #d99d92); border-color: #b57171; color: #4c1717 }
+        .lcdtop, .lcdbottom {
+            align-items: center;
+            font-family: "PixelSplitter", Consolas, "Lucida Console", monospace;
+            text-transform: uppercase;
+        }
+        .lcdtop { font-size: 13px; letter-spacing: .08em; opacity: .9; margin-bottom: 8px }
+        .lcdbottom { font-size: 12px; letter-spacing: .07em; margin-top: 10px; opacity: .88 }
+        .lcdmain {
+            font-family: "PixelSplitter", Consolas, "Lucida Console", monospace;
+            font-size: clamp(18px, 2.3vw, 28px);
+            line-height: 1.05;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .lcdchip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 3px 10px;
+            border: 1px solid rgba(31, 41, 22, .22);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .18);
+            white-space: nowrap;
+        }
+        .lcdchip .tiny { font-size: 11px; opacity: .7 }
+        .lcdchip.mode .value { width: 10ch }
+        .lcdchip.freq .value { width: 8ch }
+        .lcdchip.system .value { width: 8ch }
+        .lcdchip.record .value { width: 3ch }
+        .lcdchip.stream .value { width: 5ch }
+        .lcdchip.view .value { width: 6ch }
+        .dot { width: 8px; height: 8px; border-radius: 99px; background: #55634a }
+        .dot.live { background: var(--ok); box-shadow: 0 0 10px rgba(34, 197, 94, .45) }
+        .layout { display: grid; grid-template-columns: minmax(0, 1.2fr) 300px; gap: 14px }
+        .decktop { align-items: center; margin-bottom: 12px }
+        .decktitle { font-size: 16px; font-weight: 700; letter-spacing: .04em }
+        .audiomonitor, .vol, .playbackbadge, .timeline, .sidecard, .metabox { background: rgba(16, 22, 30, .78); padding: 10px 12px }
+        .audiomonitor { min-width: 320px; max-width: 460px; width: 46%; overflow: hidden }
+        .monitorcanvas { display: block; width: auto; height: 42px; min-width: 0; border-radius: 10px; background: linear-gradient(180deg, rgba(7, 11, 18, .98), rgba(13, 20, 30, .94)); border: 1px solid rgba(49, 66, 87, .9) }
+        .playbackbadge { min-width: 190px; font-size: 13px; font-weight: 700 }
+        .playdot { width: 10px; height: 10px; border-radius: 99px; background: #586576 }
+        .playbackbadge.is-live .playdot { background: var(--ok); box-shadow: 0 0 12px rgba(34, 197, 94, .45) }
+        .playbackbadge.is-replay .playdot { background: var(--accent); box-shadow: 0 0 12px rgba(147, 197, 253, .35) }
+        .playbackbadge.is-paused .playdot { background: var(--warn); box-shadow: 0 0 12px rgba(245, 158, 11, .35) }
+        .playbackbadge.is-muted .playdot { background: #f472b6; box-shadow: 0 0 12px rgba(244, 114, 182, .35) }
+        .playbackbadge.is-offline .playdot { background: var(--bad); box-shadow: 0 0 12px rgba(248, 113, 113, .32) }
+        .vol { min-width: 280px }
+        .vol input, .timeline input { width: 100%; accent-color: #93c5fd }
+        .timelinelegend, .historyhint, .metarow, .footer { color: var(--muted); font-size: 13px }
+        .timelinehead { align-items: center; margin-bottom: 10px }
+        .metabox .name, .sidecard .name { font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px }
+        .metabox .value, .sidecard .value { font-size: 14px; font-weight: 700 }
+        .metabox { flex: 1 1 140px }
+        .metabox.wide { flex-basis: 100% }
+        .countbig { font-family: "PixelSplitter", Consolas, monospace; font-size: 28px }
+        .radioaudio { width: 100%; margin-top: 12px }
+        a { color: var(--accent) }
+        @media (max-width: 920px) { .layout { grid-template-columns: 1fr } }
+        @media (max-width: 760px) {
+            .vol, .audiomonitor { min-width: 0; width: 100% }
+            .controls { align-items: stretch }
+            .lcdmain { font-size: clamp(20px, 5.8vw, 30px) }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <div class="topnav">
+            <div class="navtitle">Scanner Pages</div>
+            <div class="navlinks">
+                <a class="pagelink" href="/">Live</a>
+                <a class="pagelink active" href="/radio/">Radio</a>
+                <a class="pagelink" href="/recordings/">Recordings</a>
+            </div>
+        </div>
+        <div class="card">
+            <div class="label">Rewind Radio</div>
+            <div class="lcdshell" id="lcdShell">
+                <div class="lcdtop">
+                    <div class="lcdchips">
+                        <div class="lcdchip mode"><span class="tiny">Mode</span><span class="value" id="modeValue">---</span></div>
+                        <div class="lcdchip freq"><span class="tiny">Freq</span><span class="value" id="freqValue">---</span></div>
+                        <div class="lcdchip system"><span class="tiny">System</span><span class="value" id="statusValue">STOPPED</span></div>
+                        <div class="lcdchip record"><span class="tiny">Rec</span><span class="value" id="recordValue">OFF</span></div>
+                        <div class="lcdchip stream"><span class="dot" id="lcdDot"></span><span class="value" id="streamMini">Idle</span></div>
+                        <div class="lcdchip view"><span class="tiny">View</span><span class="value" id="viewValue">LIVE</span></div>
+                    </div>
+                </div>
+                <div class="lcdmain" id="channelDisplay">---</div>
+                <div class="lcdbottom">
+                    <div id="deviceValue">DEVICE ---</div>
+                    <div id="updatedValue">UPDATED --:--:--</div>
+                </div>
+            </div>
+            <div class="layout">
+                <div>
+                    <div class="label">Scanner Audio</div>
+                    <div class="deck">
+                        <div class="decktop">
+                            <div class="decktitle">Secondary Radio Deck</div>
+                            <div class="audiomonitor"><canvas class="monitorcanvas" id="audioMonitor" width="360" height="42"></canvas></div>
+                        </div>
+                        <div class="controls">
+                            <button class="btn" id="playButton" type="button">Play Audio</button>
+                            <button class="btn secondary" id="muteButton" type="button">Mute</button>
+                            <button class="btn" id="prevButton" type="button">Previous Call</button>
+                            <button class="btn" id="nextButton" type="button">Next Call</button>
+                            <button class="btn live" id="liveButton" type="button">Live</button>
+                            <div class="playbackbadge is-offline" id="playbackBadge"><span class="playdot"></span><span id="playbackState">Stopped</span></div>
+                            <div class="vol"><span>VOL</span><input id="volumeSlider" type="range" min="0" max="100" value="85"><span id="volumeValue">85%</span></div>
+                        </div>
+                        <audio id="radioAudio" class="radioaudio" controls preload="none" playsinline></audio>
+                        <div class="timeline">
+                            <div class="timelinehead">
+                                <div>
+                                    <div class="tinylabel">History Slider</div>
+                                    <div class="historyhint" id="historyHint">Live mode. Press Previous Call to load the newest recent transmission.</div>
+                                </div>
+                                <div class="playbackbadge" id="historyBadge">No calls loaded</div>
+                            </div>
+                            <input id="historySlider" type="range" min="0" max="0" step="1" value="0" disabled>
+                            <div class="timelinelegend"><span>Newest</span><span>Older</span></div>
+                        </div>
+                        <div class="callmeta">
+                            <div class="metabox"><div class="name">Selected Call</div><div class="value" id="selectedCallLabel">Live stream</div></div>
+                            <div class="metabox"><div class="name">Started</div><div class="value" id="selectedCallStarted">--</div></div>
+                            <div class="metabox"><div class="name">Duration</div><div class="value" id="selectedCallDuration">--</div></div>
+                            <div class="metabox"><div class="name">Availability</div><div class="value" id="selectedCallAvailability">Live</div></div>
+                            <div class="metabox"><div class="name">Frequency</div><div class="value" id="selectedCallFrequency">--</div></div>
+                            <div class="metabox"><div class="name">Mode</div><div class="value" id="selectedCallMode">--</div></div>
+                            <div class="metabox"><div class="name">Device</div><div class="value" id="selectedCallDevice">--</div></div>
+                            <div class="metabox wide"><div class="name">Raw Log</div><div class="value" id="selectedCallRaw">Live stream follows current scanner metadata.</div></div>
+                        </div>
+                        <div class="metarow">
+                            <div id="streamHint">Streaming disabled</div>
+                            <div><a id="rawLink" href="#" target="_blank" rel="noopener">Open raw stream page</a></div>
+                        </div>
+                    </div>
+                    <div class="footer">
+                        <div>The radio page combines the current WebRTC live stream with recent recorded calls.</div>
+                        <div id="sessionState">Idle</div>
+                    </div>
+                </div>
+                <div class="sidepanel">
+                    <div class="sidecard"><div class="name">Recent Calls</div><div class="stack"><div class="countbig" id="callCount">0</div><div class="value" id="callSummary">No recent history loaded</div></div></div>
+                    <div class="sidecard"><div class="name">Current Selection</div><div class="value" id="selectionSummary">Live stream</div></div>
+                    <div class="sidecard"><div class="name">Mode Notes</div><div class="value" id="modeNotes">Stay on live, or jump back into completed calls and return with the Live button.</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const audioEl = document.getElementById('radioAudio');
+        const playButton = document.getElementById('playButton');
+        const muteButton = document.getElementById('muteButton');
+        const prevButton = document.getElementById('prevButton');
+        const nextButton = document.getElementById('nextButton');
+        const liveButton = document.getElementById('liveButton');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeValue = document.getElementById('volumeValue');
+        const audioMonitor = document.getElementById('audioMonitor');
+        const sessionState = document.getElementById('sessionState');
+        const playbackBadge = document.getElementById('playbackBadge');
+        const playbackState = document.getElementById('playbackState');
+        const historySlider = document.getElementById('historySlider');
+        const historyHint = document.getElementById('historyHint');
+        const historyBadge = document.getElementById('historyBadge');
+        const viewValue = document.getElementById('viewValue');
+        const selectedCallLabel = document.getElementById('selectedCallLabel');
+        const selectedCallStarted = document.getElementById('selectedCallStarted');
+        const selectedCallDuration = document.getElementById('selectedCallDuration');
+        const selectedCallAvailability = document.getElementById('selectedCallAvailability');
+        const selectedCallFrequency = document.getElementById('selectedCallFrequency');
+        const selectedCallMode = document.getElementById('selectedCallMode');
+        const selectedCallDevice = document.getElementById('selectedCallDevice');
+        const selectedCallRaw = document.getElementById('selectedCallRaw');
+        const callCount = document.getElementById('callCount');
+        const callSummary = document.getElementById('callSummary');
+        const selectionSummary = document.getElementById('selectionSummary');
+        const modeNotes = document.getElementById('modeNotes');
+
+        let latestStatus = null;
+        let recentCalls = [];
+        let selectedCallId = '';
+        let selectedCallIndex = -1;
+        let playerMode = 'live';
+        let peerConnection = null;
+        let playerStarting = false;
+        let lastStreamUrl = '';
+        let userPaused = false;
+        let audioContext = null;
+        let audioSourceNode = null;
+        let analyserNode = null;
+        let audioDataArray = null;
+        let monitorFrame = 0;
+        function formatDuration(seconds) {
+            if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) return '--';
+            return `${Number(seconds).toFixed(1)}s`;
+        }
+
+        function drawMonitorIdle() {
+            const ctx = audioMonitor.getContext('2d');
+            const width = audioMonitor.width;
+            const height = audioMonitor.height;
+            ctx.clearRect(0, 0, width, height);
+            const gradient = ctx.createLinearGradient(0, 0, width, 0);
+            gradient.addColorStop(0, 'rgba(34, 197, 94, 0.08)');
+            gradient.addColorStop(1, 'rgba(147, 197, 253, 0.02)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+            ctx.strokeStyle = 'rgba(71, 85, 105, 0.35)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, height / 2);
+            ctx.lineTo(width, height / 2);
+            ctx.stroke();
+        }
+
+        function ensureAudioMonitor() {
+            if (!(window.AudioContext || window.webkitAudioContext)) return false;
+            if (!audioContext) {
+                const Context = window.AudioContext || window.webkitAudioContext;
+                audioContext = new Context();
+                analyserNode = audioContext.createAnalyser();
+                analyserNode.fftSize = 256;
+                analyserNode.smoothingTimeConstant = 0.78;
+                audioDataArray = new Uint8Array(analyserNode.frequencyBinCount);
+            }
+            if (!audioSourceNode) {
+                try {
+                    audioSourceNode = audioContext.createMediaElementSource(audioEl);
+                    audioSourceNode.connect(analyserNode);
+                    analyserNode.connect(audioContext.destination);
+                } catch (error) {
+                    return false;
+                }
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().catch(() => {});
+            }
+            return true;
+        }
+
+        function renderAudioMonitor() {
+            if (!analyserNode || !audioDataArray) {
+                drawMonitorIdle();
+                monitorFrame = 0;
+                return;
+            }
+            const ctx = audioMonitor.getContext('2d');
+            const width = audioMonitor.width;
+            const height = audioMonitor.height;
+            analyserNode.getByteFrequencyData(audioDataArray);
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = 'rgba(8, 13, 20, 0.92)';
+            ctx.fillRect(0, 0, width, height);
+            const barCount = 48;
+            const gap = 2;
+            const barWidth = (width - (barCount - 1) * gap) / barCount;
+            for (let i = 0; i < barCount; i += 1) {
+                const index = Math.min(audioDataArray.length - 1, Math.floor(i * audioDataArray.length / barCount));
+                const magnitude = audioDataArray[index] / 255;
+                const barHeight = Math.max(3, magnitude * (height - 6));
+                const x = i * (barWidth + gap);
+                const y = height - barHeight - 3;
+                const gradient = ctx.createLinearGradient(0, y, 0, height);
+                gradient.addColorStop(0, magnitude > 0.72 ? '#f59e0b' : '#9fe870');
+                gradient.addColorStop(1, playerMode === 'replay' ? '#93c5fd' : '#22c55e');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(x, y, barWidth, barHeight);
+            }
+            monitorFrame = window.requestAnimationFrame(renderAudioMonitor);
+        }
+
+        function startAudioMonitor() {
+            if (!ensureAudioMonitor()) return;
+            if (!monitorFrame) renderAudioMonitor();
+        }
+
+        function stopAudioMonitor() {
+            if (monitorFrame) {
+                window.cancelAnimationFrame(monitorFrame);
+                monitorFrame = 0;
+            }
+            drawMonitorIdle();
+        }
+
+        function setSessionState(text) {
+            sessionState.textContent = text;
+        }
+
+        function setPlaybackState(text, stateClass) {
+            playbackState.textContent = text;
+            playbackBadge.classList.remove('is-live', 'is-replay', 'is-paused', 'is-muted', 'is-offline');
+            if (stateClass) playbackBadge.classList.add(stateClass);
+        }
+
+        function getSelectedCall() {
+            return selectedCallIndex >= 0 ? recentCalls[selectedCallIndex] || null : null;
+        }
+
+        function updateSelectionMeta() {
+            const item = getSelectedCall();
+            if (playerMode === 'live' || !item) {
+                selectedCallLabel.textContent = 'Live stream';
+                selectedCallStarted.textContent = '--';
+                selectedCallDuration.textContent = '--';
+                selectedCallAvailability.textContent = latestStatus && latestStatus.streaming_enabled ? 'Live available' : 'Live unavailable';
+                selectedCallFrequency.textContent = latestStatus && latestStatus.frequency ? latestStatus.frequency : '--';
+                selectedCallMode.textContent = latestStatus && latestStatus.mode ? latestStatus.mode : '--';
+                selectedCallDevice.textContent = latestStatus && latestStatus.audio_device ? latestStatus.audio_device : '--';
+                selectedCallRaw.textContent = 'Live stream follows current scanner metadata.';
+                selectionSummary.textContent = 'Live stream';
+                modeNotes.textContent = 'Stay on live, or jump back into completed calls and return with the Live button.';
+                return;
+            }
+            selectedCallLabel.textContent = item.label || 'Unknown Channel';
+            selectedCallStarted.textContent = item.started_at_label || '--';
+            selectedCallDuration.textContent = formatDuration(item.duration_seconds);
+            selectedCallAvailability.textContent = item.file_exists ? 'Replay ready' : 'File missing';
+            selectedCallFrequency.textContent = item.frequency || '--';
+            selectedCallMode.textContent = item.mode || '--';
+            selectedCallDevice.textContent = item.audio_device || '--';
+            selectedCallRaw.textContent = item.raw_log_line || 'No raw log line available.';
+            selectionSummary.textContent = `${item.label || 'Unknown'} ${item.frequency || ''}`.trim();
+            modeNotes.textContent = 'Replay stays on this historic call until you move the slider, use Previous or Next, or press Live.';
+        }
+
+        function updateHistoryUi() {
+            callCount.textContent = String(recentCalls.length);
+            callSummary.textContent = recentCalls.length ? `Newest ${recentCalls.length} completed calls loaded` : 'No recent history loaded';
+            historySlider.disabled = !recentCalls.length;
+            historySlider.min = '0';
+            historySlider.max = String(Math.max(0, recentCalls.length - 1));
+            if (selectedCallIndex >= 0) historySlider.value = String(selectedCallIndex);
+historyBadge.textContent = recentCalls.length ? `${recentCalls.length} calls ready` : 'No calls loaded';
+            viewValue.textContent = playerMode === 'live' ? 'LIVE' : 'REPLAY';
+            liveButton.classList.toggle('is-active', playerMode === 'live');
+            prevButton.disabled = !recentCalls.length || (playerMode === 'replay' && selectedCallIndex >= recentCalls.length - 1);
+            nextButton.disabled = !recentCalls.length || playerMode === 'live' || selectedCallIndex <= 0;
+            if (playerMode === 'live') {
+                historyHint.textContent = recentCalls.length ? 'Live mode. Press Previous Call to load the newest recent transmission.' : 'Live mode. No completed calls are available yet.';
+            } else if (getSelectedCall()) {
+                historyHint.textContent = `Replay mode. Slider position ${selectedCallIndex + 1} of ${recentCalls.length}. Move right for older calls.`;
+            } else {
+                historyHint.textContent = 'Replay mode is waiting for a selected call.';
+            }
+            updateSelectionMeta();
+        }
+
+        function updateButtons() {
+            const isPlaying = !audioEl.paused && !audioEl.ended;
+            const liveReady = !!(latestStatus && latestStatus.streaming_enabled && latestStatus.raw_stream_url);
+            playButton.textContent = playerStarting ? 'Connecting...' : isPlaying ? 'Pause Audio' : (playerMode === 'live' ? 'Play Audio' : 'Play Call');
+            muteButton.textContent = audioEl.muted ? 'Unmute' : 'Mute';
+            playButton.classList.toggle('is-active', isPlaying && playerMode === 'live');
+            playButton.classList.toggle('is-paused', !playerStarting && !isPlaying);
+            muteButton.classList.toggle('is-muted', audioEl.muted);
+            liveButton.disabled = !liveReady && playerMode !== 'live';
+            if (playerStarting) {
+                setPlaybackState('Connecting', 'is-paused');
+            } else if (audioEl.muted && isPlaying) {
+                setPlaybackState(playerMode === 'live' ? 'Muted Live' : 'Muted Replay', 'is-muted');
+            } else if (isPlaying) {
+                setPlaybackState(playerMode === 'live' ? 'Playing Live' : 'Playing Replay', playerMode === 'live' ? 'is-live' : 'is-replay');
+            } else if (userPaused) {
+                setPlaybackState('Paused', 'is-paused');
+            } else {
+                setPlaybackState(playerMode === 'live' ? (liveReady ? 'Standby Live' : 'Stream Off') : 'Replay Ready', playerMode === 'live' ? 'is-offline' : 'is-replay');
+            }
+            updateHistoryUi();
+        }
+
+        function setVolume(value) {
+            const n = Math.max(0, Math.min(100, value));
+            audioEl.volume = n / 100;
+            volumeSlider.value = n;
+            volumeValue.textContent = n + '%';
+        }
+
+        function closePeerConnection() {
+            if (peerConnection) {
+                try { peerConnection.ontrack = null; } catch (err) {}
+                try { peerConnection.close(); } catch (err) {}
+                peerConnection = null;
+            }
+        }
+
+        function clearAudioSource() {
+            audioEl.pause();
+            audioEl.removeAttribute('src');
+            audioEl.srcObject = null;
+            audioEl.load();
+        }
+
+        function closePlayer() {
+            closePeerConnection();
+            clearAudioSource();
+            playerStarting = false;
+            stopAudioMonitor();
+            updateButtons();
+        }
+        function waitForIceComplete(pc, timeoutMs) {
+            return new Promise((resolve) => {
+                if (pc.iceGatheringState === 'complete') {
+                    resolve();
+                    return;
+                }
+                const timeout = setTimeout(done, timeoutMs);
+                function onChange() {
+                    if (pc.iceGatheringState === 'complete') done();
+                }
+                function done() {
+                    clearTimeout(timeout);
+                    pc.removeEventListener('icegatheringstatechange', onChange);
+                    resolve();
+                }
+                pc.addEventListener('icegatheringstatechange', onChange);
+            });
+        }
+
+        async function startLive(autoStart) {
+            if (playerStarting) return;
+            if (!latestStatus || !latestStatus.streaming_enabled || !latestStatus.raw_stream_url) {
+                playerMode = 'live';
+                setSessionState('No stream available');
+                updateButtons();
+                return;
+            }
+            closePlayer();
+            playerMode = 'live';
+            playerStarting = true;
+            userPaused = false;
+            playButton.disabled = true;
+            updateButtons();
+            setSessionState('Negotiating live WebRTC session');
+            try {
+                const pc = new RTCPeerConnection({ iceServers: [] });
+                peerConnection = pc;
+                pc.addTransceiver('audio', { direction: 'recvonly' });
+                pc.ontrack = async (event) => {
+                    const stream = event.streams[0];
+                    if (stream) {
+                        audioEl.srcObject = stream;
+                        if (!userPaused || autoStart) {
+                            try {
+                                await audioEl.play();
+                                startAudioMonitor();
+                            } catch (err) {
+                                setSessionState('Press Play Audio to start live sound');
+                                setPlaybackState('Awaiting Click', 'is-paused');
+                            }
+                        }
+                        updateButtons();
+                    }
+                };
+                pc.onconnectionstatechange = () => {
+                    const state = pc.connectionState;
+                    if (state === 'connected') {
+                        setSessionState('Live radio connected');
+                    } else if (state === 'connecting') {
+                        setSessionState('Establishing peer connection');
+                    } else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+                        setSessionState('Reconnect by pressing Play Audio or Live');
+                        if (playerMode === 'live') setPlaybackState('Connection Lost', 'is-offline');
+                    }
+                };
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                await waitForIceComplete(pc, 1500);
+                const res = await fetch('/api/whep', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/sdp' },
+                    body: pc.localDescription.sdp,
+                    cache: 'no-store'
+                });
+                if (!res.ok) throw new Error('WHEP request failed with status ' + res.status);
+                const answer = await res.text();
+                await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+                setSessionState('Waiting for live audio packets');
+            } catch (err) {
+                closePlayer();
+                playerMode = 'live';
+                setSessionState(err && err.message ? err.message : 'Failed to start live player');
+            } finally {
+                playerStarting = false;
+                playButton.disabled = false;
+                updateButtons();
+            }
+        }
+
+        async function playReplay(index, autoplay) {
+            const item = recentCalls[index];
+            playerMode = 'replay';
+            selectedCallIndex = index;
+            selectedCallId = item ? item.id : '';
+            if (!item) {
+                updateButtons();
+                return;
+            }
+            closePeerConnection();
+            playerStarting = false;
+            userPaused = false;
+            if (!item.file_exists || !item.playable_url) {
+                clearAudioSource();
+                setSessionState('Selected call is missing its audio file');
+                setPlaybackState('Missing File', 'is-offline');
+                updateButtons();
+                return;
+            }
+            audioEl.pause();
+            audioEl.srcObject = null;
+            audioEl.src = item.playable_url;
+            audioEl.load();
+            setSessionState(`Loaded replay from ${item.started_at_label || 'recent history'}`);
+            if (autoplay) {
+                try {
+                    await audioEl.play();
+                    startAudioMonitor();
+                } catch (err) {
+                    setSessionState('Press Play Call to start replay audio');
+                    setPlaybackState('Awaiting Click', 'is-paused');
+                }
+            } else {
+                stopAudioMonitor();
+            }
+            updateButtons();
+        }
+
+        function syncSelectionFromRecentCalls() {
+            if (!recentCalls.length) {
+                selectedCallIndex = -1;
+                if (playerMode === 'replay') {
+                    selectedCallId = '';
+                    setSessionState('Replay history is empty');
+                }
+                updateButtons();
+                return;
+            }
+            if (selectedCallId) {
+                const index = recentCalls.findIndex((item) => item.id === selectedCallId);
+                selectedCallIndex = index;
+            }
+            if (selectedCallIndex < 0 && playerMode === 'replay') {
+                selectedCallIndex = 0;
+                selectedCallId = recentCalls[0].id;
+            }
+            updateButtons();
+        }
+
+        async function loadRecentCalls() {
+            try {
+                const response = await fetch('/api/radio-calls?limit=40', { cache: 'no-store' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const payload = await response.json();
+                recentCalls = Array.isArray(payload.items) ? payload.items : [];
+                syncSelectionFromRecentCalls();
+            } catch (error) {
+                recentCalls = [];
+                syncSelectionFromRecentCalls();
+                historyHint.textContent = 'Recent calls could not be loaded.';
+                historyBadge.textContent = 'Load failed';
+            }
+        }
+
+        async function refreshStatus() {
+            try {
+                const res = await fetch('/api/status', { cache: 'no-store' });
+                const data = await res.json();
+                latestStatus = data;
+                const streamState = (data.stream_status || 'OFF').toUpperCase();
+                const recording = !!data.recording;
+                const statusText = (data.status || 'STOPPED').toUpperCase();
+                document.getElementById('statusValue').textContent = statusText;
+                document.getElementById('recordValue').textContent = recording ? 'ON' : 'OFF';
+                document.getElementById('channelDisplay').textContent = data.display || '---';
+                document.getElementById('lcdShell').classList.toggle('recording', recording);
+                document.getElementById('freqValue').textContent = data.frequency || '---';
+                document.getElementById('modeValue').textContent = data.mode || '---';
+                document.getElementById('streamMini').textContent = streamState;
+                document.getElementById('deviceValue').textContent = 'DEVICE ' + (data.audio_device || '---');
+                document.getElementById('updatedValue').textContent = 'UPDATED ' + (data.updated_at || '---');
+                document.getElementById('lcdDot').classList.toggle('live', streamState === 'LIVE' || streamState === 'READY');
+                const rawUrl = data.raw_stream_url || '';
+                document.getElementById('rawLink').href = rawUrl ? rawUrl + '/' : '#';
+                document.getElementById('streamHint').textContent = data.streaming_enabled ? ('Live source: ' + rawUrl) : 'Streaming disabled';
+                const ready = data.streaming_enabled && rawUrl && ['LIVE', 'READY'].includes(streamState);
+                if (playerMode === 'live') {
+                    if (!ready) {
+                        closePeerConnection();
+                        audioEl.pause();
+                        audioEl.srcObject = null;
+                        stopAudioMonitor();
+                        setSessionState(data.streaming_enabled ? 'Waiting for live stream...' : 'Enable streaming in the app');
+                        lastStreamUrl = rawUrl;
+                    } else if ((!peerConnection || peerConnection.connectionState === 'closed' || peerConnection.connectionState === 'failed') && !playerStarting) {
+                        lastStreamUrl = rawUrl;
+                        startLive(true);
+                    } else if (rawUrl !== lastStreamUrl && !playerStarting) {
+                        lastStreamUrl = rawUrl;
+                        startLive(true);
+                    }
+                }
+                updateButtons();
+            } catch (err) {
+                setSessionState('Metadata request failed');
+                if (playerMode === 'live') setPlaybackState('Status Error', 'is-offline');
+            }
+        }
+        playButton.addEventListener('click', async () => {
+            if (playerMode === 'live') {
+                if (!peerConnection || peerConnection.connectionState === 'closed' || peerConnection.connectionState === 'failed') {
+                    userPaused = false;
+                    await startLive(false);
+                    return;
+                }
+                if (audioEl.paused) {
+                    userPaused = false;
+                    try {
+                        await audioEl.play();
+                        startAudioMonitor();
+                        setSessionState('Live audio resumed');
+                    } catch (err) {
+                        setSessionState('Browser blocked autoplay, press Play Audio again');
+                        setPlaybackState('Awaiting Click', 'is-paused');
+                    }
+                } else {
+                    userPaused = true;
+                    audioEl.pause();
+                    setSessionState('Live audio paused locally');
+                }
+            } else {
+                const item = getSelectedCall();
+                if (!item) {
+                    setSessionState('Select a recent call first');
+                } else if (!item.file_exists || !item.playable_url) {
+                    setSessionState('This historic call is missing its audio file');
+                } else if (audioEl.paused) {
+                    userPaused = false;
+                    try {
+                        await audioEl.play();
+                        startAudioMonitor();
+                        setSessionState('Replay resumed');
+                    } catch (err) {
+                        setSessionState('Press Play Call again to start replay audio');
+                    }
+                } else {
+                    userPaused = true;
+                    audioEl.pause();
+                    setSessionState('Replay paused');
+                }
+            }
+            updateButtons();
+        });
+
+        muteButton.addEventListener('click', () => {
+            audioEl.muted = !audioEl.muted;
+            updateButtons();
+        });
+
+        prevButton.addEventListener('click', async () => {
+            if (!recentCalls.length) return;
+            if (playerMode === 'live') {
+                await playReplay(0, true);
+                return;
+            }
+            const targetIndex = Math.min(recentCalls.length - 1, selectedCallIndex + 1);
+            if (targetIndex !== selectedCallIndex) await playReplay(targetIndex, true);
+        });
+
+        nextButton.addEventListener('click', async () => {
+            if (playerMode !== 'replay' || !recentCalls.length) return;
+            const targetIndex = Math.max(0, selectedCallIndex - 1);
+            if (targetIndex !== selectedCallIndex) await playReplay(targetIndex, true);
+        });
+
+        liveButton.addEventListener('click', async () => {
+            selectedCallId = '';
+            selectedCallIndex = -1;
+            await startLive(false);
+        });
+
+        historySlider.addEventListener('input', () => {
+            if (!recentCalls.length) return;
+            const index = Number(historySlider.value);
+            selectedCallIndex = index;
+            selectedCallId = recentCalls[index] ? recentCalls[index].id : '';
+            playerMode = 'replay';
+            updateButtons();
+        });
+
+        historySlider.addEventListener('change', async () => {
+            if (!recentCalls.length) return;
+            const index = Number(historySlider.value);
+            const shouldAutoplay = !audioEl.paused && playerMode === 'replay';
+            await playReplay(index, shouldAutoplay);
+        });
+
+        volumeSlider.addEventListener('input', (event) => setVolume(Number(event.target.value)));
+
+        audioEl.addEventListener('play', () => {
+            startAudioMonitor();
+            updateButtons();
+        });
+
+        audioEl.addEventListener('pause', () => {
+            stopAudioMonitor();
+            updateButtons();
+        });
+
+        audioEl.addEventListener('ended', () => {
+            stopAudioMonitor();
+            if (playerMode === 'replay') {
+                setSessionState('Replay finished. Press Live to return to current audio.');
+                setPlaybackState('Replay Ended', 'is-replay');
+            }
+            updateButtons();
+        });
+
+        audioEl.addEventListener('error', () => {
+            setSessionState(playerMode === 'live' ? 'Live playback failed' : 'Replay playback failed');
+            setPlaybackState('Playback Error', 'is-offline');
+        });
+
+        drawMonitorIdle();
+        setVolume(85);
+        setPlaybackState('Stopped', 'is-offline');
+        updateButtons();
+        Promise.all([loadRecentCalls(), refreshStatus()]).then(() => {
+            if (latestStatus && latestStatus.streaming_enabled && latestStatus.raw_stream_url) {
+                startLive(true);
+            }
+        });
+        setInterval(refreshStatus, 500);
+        setInterval(loadRecentCalls, 3000);
+    </script>
+</body>
+</html>

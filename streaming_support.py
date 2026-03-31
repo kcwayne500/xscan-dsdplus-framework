@@ -1,4 +1,4 @@
-﻿import os
+import os
 import shutil
 import socket
 import subprocess
@@ -61,7 +61,7 @@ class StreamingManager:
         self.log_func = log_func
         self.status_func = status_func
         self.url_func = url_func
-        self.mediamtx_dir = os.path.join(base_dir, "mediamtx")
+        self.mediamtx_dir = self._resolve_mediamtx_dir(base_dir)
         self.mediamtx_exe = os.path.join(self.mediamtx_dir, "mediamtx.exe")
         self.mediamtx_config = os.path.join(self.mediamtx_dir, "mediamtx.generated.yml")
         self.ffmpeg_exe = os.path.join(ffmpeg_dir, "ffmpeg.exe")
@@ -69,6 +69,16 @@ class StreamingManager:
         self.publish_process = None
         self.lock = threading.Lock()
         self.threads = []
+
+    def _resolve_mediamtx_dir(self, base_dir):
+        candidates = [
+            os.path.join(base_dir, "mediamtx"),
+            os.path.join(os.path.dirname(base_dir), "mediamtx"),
+        ]
+        for candidate in candidates:
+            if os.path.exists(os.path.join(candidate, "mediamtx.exe")):
+                return candidate
+        return candidates[0]
 
     def get_webrtc_url(self):
         return f"http://{get_preferred_lan_ip()}:{STREAM_WEBRTC_PORT}/{STREAM_NAME}"
