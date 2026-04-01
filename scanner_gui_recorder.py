@@ -23,14 +23,25 @@ from PySide6.QtCore import Signal, QTimer
 from streaming_support import StreamingManager
 from scanner_web_server import MetadataWebServer
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+def get_app_dir():
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def get_resource_dir():
+    return getattr(sys, "_MEIPASS", get_app_dir())
+
+
+SCRIPT_DIR = get_app_dir()
+RESOURCE_DIR = get_resource_dir()
 LOG_FILE = r"C:\DSDPlusFastlane\startup\fmp24_scan.log"
 OUTPUT_DIR = r"C:\DSDPlusFastlane\recordings"
-LOCAL_FFMPEG_DIR = os.path.join(SCRIPT_DIR, "ffmpeg")
+LOCAL_FFMPEG_DIR = os.path.join(RESOURCE_DIR, "ffmpeg")
 LOCAL_FFMPEG_EXE = os.path.join(LOCAL_FFMPEG_DIR, "ffmpeg.exe")
 RECORDINGS_LOG_FILE = os.path.join(OUTPUT_DIR, "recordings_log.json")
 SETTINGS_FILE = os.path.join(SCRIPT_DIR, "scanner_gui_recorder_settings.json")
-ICON_FILE = os.path.join(SCRIPT_DIR, "app.ico")
+ICON_FILE = os.path.join(RESOURCE_DIR, "app.ico")
 WEB_UI_PORT = 8890
 
 POLL_INTERVAL_SEC = 0.02
@@ -804,6 +815,7 @@ window = RecorderGUI()
 window.resize(620, 660)
 window.show()
 sys.exit(app.exec())
+
 
 
 
