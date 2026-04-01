@@ -1,4 +1,3 @@
-﻿import sys
 import json
 import mimetypes
 import os
@@ -9,12 +8,8 @@ import urllib.request
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-def get_resource_dir():
-    return getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-
-
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-WEB_UI_DIR = os.path.join(get_resource_dir(), "webui")
+WEB_UI_DIR = os.path.join(SCRIPT_DIR, "webui")
 RECORDINGS_DIR = r"C:\DSDPlusFastlane\recordings"
 RECORDINGS_LOG_FILE = os.path.join(RECORDINGS_DIR, "recordings_log.json")
 
@@ -319,5 +314,4 @@ class MetadataWebServer:
         finally:
             self.httpd = None
             self.thread = None
-
 
