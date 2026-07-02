@@ -1,6 +1,8 @@
 import json
+import ipaddress
 import mimetypes
 import os
+import sys
 import threading
 import urllib.error
 import urllib.parse
@@ -12,6 +14,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 WEB_UI_DIR = os.path.join(SCRIPT_DIR, "webui")
 RECORDINGS_DIR = r"C:\DSDPlusFastlane\recordings"
 RECORDINGS_LOG_FILE = os.path.join(RECORDINGS_DIR, "recordings_log.json")
+DISCONNECT_ERRORS = (BrokenPipeError, ConnectionAbortedError, ConnectionResetError)
 
 
 def _parse_datetime(value):
@@ -172,16 +175,52 @@ def _is_allowed_audio_file(filename):
     return any(item.get("audio_file") == safe_name for item in normalized)
 
 
+def _is_allowed_client(host):
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return address.is_loopback or address.is_private or address.is_link_local
+
+
+class _ThreadingHTTPServer(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def handle_error(self, request, client_address):
+        exc = sys.exc_info()[1]
+        if isinstance(exc, DISCONNECT_ERRORS):
+            return
+        super().handle_error(request, client_address)
+
+
 class _Handler(BaseHTTPRequestHandler):
     server_version = "ScannerMetadataServer/1.0"
 
+    def handle_one_request(self):
+        try:
+            super().handle_one_request()
+        except DISCONNECT_ERRORS:
+            self.close_connection = True
+
+    def _client_allowed(self):
+        host = self.client_address[0] if self.client_address else ""
+        if _is_allowed_client(host):
+            return True
+        self.close_connection = True
+        self._send_bytes(403, "text/plain; charset=utf-8", b"forbidden")
+        return False
+
     def _send_bytes(self, status, content_type, data, cache_control="no-store"):
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Cache-Control", cache_control)
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Cache-Control", cache_control)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        except DISCONNECT_ERRORS:
+            self.close_connection = True
 
     def _read_body(self):
         length = int(self.headers.get("Content-Length", "0") or "0")
@@ -199,8 +238,54 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_bytes(404, "text/plain; charset=utf-8", b"not found")
             return
         content_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
-        with open(file_path, "rb") as handle:
-            self._send_bytes(200, content_type, handle.read(), cache_control=cache_control)
+        file_size = os.path.getsize(file_path)
+        range_header = self.headers.get("Range", "")
+        start = 0
+        end = file_size - 1
+        status = 200
+        if range_header.startswith("bytes="):
+            range_value = range_header.split("=", 1)[1].split(",", 1)[0].strip()
+            raw_start, _, raw_end = range_value.partition("-")
+            try:
+                if raw_start:
+                    start = int(raw_start)
+                    end = int(raw_end) if raw_end else file_size - 1
+                elif raw_end:
+                    suffix_size = int(raw_end)
+                    start = max(0, file_size - suffix_size)
+                    end = file_size - 1
+                if start < 0 or end < start or start >= file_size:
+                    self.send_response(416)
+                    self.send_header("Content-Range", f"bytes */{file_size}")
+                    self.end_headers()
+                    return
+                end = min(end, file_size - 1)
+                status = 206
+            except ValueError:
+                start = 0
+                end = file_size - 1
+                status = 200
+        content_length = max(0, end - start + 1)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Cache-Control", cache_control)
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Content-Length", str(content_length))
+            if status == 206:
+                self.send_header("Content-Range", f"bytes {start}-{end}/{file_size}")
+            self.end_headers()
+            with open(file_path, "rb") as handle:
+                handle.seek(start)
+                remaining = content_length
+                while remaining > 0:
+                    chunk = handle.read(min(1024 * 256, remaining))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    remaining -= len(chunk)
+        except DISCONNECT_ERRORS:
+            self.close_connection = True
 
     def _resolve_webui_path(self, request_path):
         relative_path = urllib.parse.urlsplit(request_path).path.lstrip("/")
@@ -216,6 +301,8 @@ class _Handler(BaseHTTPRequestHandler):
         return candidate
 
     def do_GET(self):
+        if not self._client_allowed():
+            return
         parsed = urllib.parse.urlsplit(self.path)
         path = parsed.path
         params = urllib.parse.parse_qs(parsed.query)
@@ -254,6 +341,8 @@ class _Handler(BaseHTTPRequestHandler):
         self._send_bytes(404, "text/plain; charset=utf-8", b"not found")
 
     def do_POST(self):
+        if not self._client_allowed():
+            return
         if self.path != "/api/whep":
             self._send_bytes(404, "text/plain; charset=utf-8", b"not found")
             return
@@ -300,7 +389,7 @@ class MetadataWebServer:
     def start(self):
         if self.httpd is not None:
             return
-        self.httpd = ThreadingHTTPServer((self.host, self.port), _Handler)
+        self.httpd = _ThreadingHTTPServer((self.host, self.port), _Handler)
         self.httpd.payload_func = self.payload_func
         self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
         self.thread.start()

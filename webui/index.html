@@ -399,6 +399,7 @@
         }
 
         .timelinepanel {
+            position: relative;
             margin-top: 12px;
             padding: 12px;
             border-radius: 14px;
@@ -455,6 +456,56 @@
             margin-top: 8px;
             color: var(--muted);
             font-size: 12px
+        }
+
+        .timelinecolors {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 12px
+        }
+
+        .timelinekey {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px
+        }
+
+        .timelinekey::before {
+            content: "";
+            width: 9px;
+            height: 9px;
+            border-radius: 99px;
+            background: var(--key)
+        }
+
+        .timelinetooltip {
+            position: absolute;
+            z-index: 10;
+            max-width: min(320px, calc(100% - 24px));
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #3b4b62;
+            background: rgba(8, 13, 20, .98);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, .35);
+            color: var(--text);
+            font-size: 12px;
+            line-height: 1.45;
+            pointer-events: none;
+            display: none
+        }
+
+        .timelinetooltip strong {
+            display: block;
+            font-size: 13px;
+            margin-bottom: 3px
+        }
+
+        .timelinetooltip span {
+            display: block;
+            color: var(--muted)
         }
 
         .timelineinfo {
@@ -560,8 +611,15 @@
                         <div class="timelinestatus" id="timelineStatus">LIVE NOW</div>
                     </div>
                     <canvas class="timelinemap" id="timelineMap" width="860" height="48"></canvas>
+                    <div class="timelinetooltip" id="timelineTooltip"></div>
                     <input class="timelineslider" id="timelineSlider" type="range" min="0" max="0" step="1" value="0">
                     <div class="timelinelegend"><span>Older</span><span>Live</span></div>
+                    <div class="timelinecolors">
+                        <span class="timelinekey" style="--key:#22c55e">Short</span>
+                        <span class="timelinekey" style="--key:#38bdf8">Medium</span>
+                        <span class="timelinekey" style="--key:#f59e0b">Long</span>
+                        <span class="timelinekey" style="--key:#f87171">Very long</span>
+                    </div>
                     <div class="timelineinfo">
                         <div class="timelinepill"><span>Selected</span><strong id="timelineLabel">Live audio</strong></div>
                         <div class="timelinepill"><span>When</span><strong id="timelineWhen">Now</strong></div>
@@ -588,6 +646,8 @@
             volumeValue = document.getElementById('volumeValue'),
             audioMonitor = document.getElementById('audioMonitor'),
             timelineMap = document.getElementById('timelineMap'),
+            timelinePanel = document.querySelector('.timelinepanel'),
+            timelineTooltip = document.getElementById('timelineTooltip'),
             timelineSlider = document.getElementById('timelineSlider'),
             timelineCopy = document.getElementById('timelineCopy'),
             timelineStatus = document.getElementById('timelineStatus'),
@@ -609,10 +669,15 @@
             monitorSourceNode = null,
             analyserNode = null,
             audioDataArray = null,
-            monitorFrame = 0;
+            monitorFrame = 0,
+            timelineHitRegions = [],
+            hoveredCall = null;
 
-        function setPlayerStatus() {
-            return
+        function setPlayerStatus(text, live) {
+            const label = text || 'Stream status unknown';
+            document.getElementById('streamMini').textContent = live ? 'LIVE' : label.split(' ')[0].toUpperCase();
+            document.getElementById('lcdDot').classList.toggle('live', !!live);
+            document.getElementById('streamHint').textContent = label
         }
 
         function drawMonitorIdle() {
@@ -727,6 +792,32 @@
             return item.started_at_label || item.started_at || 'Recent'
         }
 
+        function escapeHtml(value) {
+            return String(value || '').replace(/[&<>"']/g, (char) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            })[char])
+        }
+
+        function formatDuration(seconds) {
+            const value = Number(seconds) || 0;
+            if (value < 60) return value.toFixed(value < 10 ? 1 : 0) + ' sec';
+            const minutes = Math.floor(value / 60);
+            const remainder = Math.round(value % 60);
+            return minutes + 'm ' + String(remainder).padStart(2, '0') + 's'
+        }
+
+        function durationBand(seconds) {
+            const value = Number(seconds) || 0;
+            if (value >= 12) return { label: 'Very long', color: '#f87171' };
+            if (value >= 6) return { label: 'Long', color: '#f59e0b' };
+            if (value >= 2.5) return { label: 'Medium', color: '#38bdf8' };
+            return { label: 'Short', color: '#22c55e' }
+        }
+
         function sliderValueForCall(item) {
             if (!item || !recentCalls.length) return recentCalls.length;
             const index = recentCalls.findIndex((entry) => entry.id === item.id);
@@ -744,6 +835,7 @@
             const ctx = timelineMap.getContext('2d');
             const width = timelineMap.width;
             const height = timelineMap.height;
+            timelineHitRegions = [];
             ctx.clearRect(0, 0, width, height);
             ctx.fillStyle = 'rgba(8, 13, 20, 0.92)';
             ctx.fillRect(0, 0, width, height);
@@ -755,20 +847,64 @@
             ctx.stroke();
             if (!recentCalls.length) return;
             const maxValue = recentCalls.length;
+            const maxDuration = Math.max(1, ...recentCalls.map((item) => Number(item.duration_seconds) || 0));
             recentCalls.forEach((item, index) => {
                 const sliderValue = recentCalls.length - 1 - index;
                 const ratio = maxValue === 0 ? 1 : sliderValue / maxValue;
                 const x = 12 + ratio * (width - 24);
                 const isSelected = selectedCall && item.id === selectedCall.id;
                 const isPreview = previewCall && item.id === previewCall.id;
-                const barHeight = Math.max(10, Math.min(26, 8 + Math.round((Number(item.duration_seconds) || 0) * 2)));
-                ctx.fillStyle = isSelected ? '#93c5fd' : isPreview ? '#f59e0b' : '#22c55e';
-                ctx.fillRect(x - 3, (height - barHeight) / 2, 6, barHeight);
+                const isHovered = hoveredCall && item.id === hoveredCall.id;
+                const duration = Number(item.duration_seconds) || 0;
+                const barHeight = Math.max(8, Math.min(height - 12, 8 + Math.round((duration / maxDuration) * (height - 18))));
+                const barWidth = isSelected || isPreview || isHovered ? 8 : 6;
+                const band = durationBand(duration);
+                ctx.fillStyle = isSelected ? '#d7e2af' : isPreview ? '#f8d36a' : band.color;
+                ctx.fillRect(x - barWidth / 2, (height - barHeight) / 2, barWidth, barHeight);
+                if (isHovered) {
+                    ctx.strokeStyle = '#e5edf5';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x - barWidth / 2 - 2, (height - barHeight) / 2 - 2, barWidth + 4, barHeight + 4)
+                }
+                timelineHitRegions.push({
+                    item,
+                    x1: x - Math.max(8, barWidth),
+                    x2: x + Math.max(8, barWidth),
+                    y1: (height - barHeight) / 2 - 4,
+                    y2: (height + barHeight) / 2 + 4
+                });
             });
             ctx.fillStyle = '#d7e2af';
             ctx.beginPath();
             ctx.arc(width - 12, height / 2, 4, 0, Math.PI * 2);
             ctx.fill();
+        }
+
+        function callFromTimelineEvent(event) {
+            const rect = timelineMap.getBoundingClientRect();
+            const x = (event.clientX - rect.left) * (timelineMap.width / rect.width);
+            const y = (event.clientY - rect.top) * (timelineMap.height / rect.height);
+            return timelineHitRegions.find((region) => x >= region.x1 && x <= region.x2 && y >= region.y1 && y <= region.y2)?.item || null
+        }
+
+        function showTimelineTooltip(item, event) {
+            if (!item) {
+                timelineTooltip.style.display = 'none';
+                return
+            }
+            const panelRect = timelinePanel.getBoundingClientRect();
+            const duration = Number(item.duration_seconds) || 0;
+            const band = durationBand(duration);
+            timelineTooltip.innerHTML = '<strong>' + escapeHtml(formatCallLabel(item)) + '</strong>' +
+                '<span>' + escapeHtml(formatCallWhen(item)) + '</span>' +
+                '<span>Duration: ' + escapeHtml(formatDuration(duration)) + ' (' + band.label + ')</span>' +
+                '<span>Mode: ' + escapeHtml(item.mode || 'unknown') + '</span>' +
+                '<span>File: ' + escapeHtml(item.audio_file || 'not available') + '</span>';
+            timelineTooltip.style.display = 'block';
+            const left = Math.min(panelRect.width - timelineTooltip.offsetWidth - 12, Math.max(12, event.clientX - panelRect.left + 12));
+            const top = Math.min(panelRect.height - timelineTooltip.offsetHeight - 12, Math.max(12, event.clientY - panelRect.top + 12));
+            timelineTooltip.style.left = left + 'px';
+            timelineTooltip.style.top = top + 'px'
         }
 
         function updateTimelineUi() {
@@ -778,7 +914,7 @@
             timelineStatus.textContent = mode === 'live' ? 'LIVE NOW' : 'REPLAY';
             timelineLabel.textContent = mode === 'live' ? 'Live audio' : formatCallLabel(activeItem);
             timelineWhen.textContent = mode === 'live' ? 'Now' : formatCallWhen(activeItem);
-            timelineCopy.textContent = recentCalls.length ? 'Drag left to recent calls you may have missed, then release to hear one. Press Live to jump back.' : 'Waiting for completed calls to appear in the rewind timeline.';
+            timelineCopy.textContent = recentCalls.length ? 'Bar height shows transmission length. Hover for details, click a bar or drag the line to replay. Press Live to jump back.' : 'Waiting for completed calls to appear in the rewind timeline.';
             liveButton.classList.toggle('is-live', mode === 'live');
             drawTimelineMap()
         }
@@ -1073,6 +1209,28 @@
                 return
             }
             await playReplay(item, true)
+        });
+
+        timelineMap.addEventListener('mousemove', (event) => {
+            const item = callFromTimelineEvent(event);
+            if ((hoveredCall && item && hoveredCall.id === item.id) || (!hoveredCall && !item)) {
+                showTimelineTooltip(item, event);
+                return
+            }
+            hoveredCall = item;
+            drawTimelineMap();
+            showTimelineTooltip(item, event)
+        });
+
+        timelineMap.addEventListener('mouseleave', () => {
+            hoveredCall = null;
+            timelineTooltip.style.display = 'none';
+            drawTimelineMap()
+        });
+
+        timelineMap.addEventListener('click', async (event) => {
+            const item = callFromTimelineEvent(event);
+            if (item) await playReplay(item, true)
         });
 
         volumeSlider.addEventListener('input', (event) => setVolume(Number(event.target.value)));
