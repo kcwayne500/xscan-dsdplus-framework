@@ -6,6 +6,7 @@ import subprocess
 import threading
 import time
 import wave
+from collections import deque
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Callable, Optional
@@ -18,12 +19,16 @@ AUDIO_CHANNELS = 1
 AUDIO_DTYPE = "int16"
 AUDIO_BLOCKSIZE = 2048
 AUDIO_TRIGGER_LEVEL = 0.0021
-SILENCE_HANG_SEC = 1.00
-MIN_RECORD_SEC = 0.50
+SILENCE_HANG_SEC = 1.75
+MIN_RECORD_SEC = 0.90
+PRE_ROLL_SEC = 0.45
+AUDIO_START_BLOCKS = 3
 POLL_INTERVAL_SEC = 0.02
 LOG_POLL_SEC = 0.05
 
 TUNING_REGEX = re.compile(r"Tuning to\s+([\d.]+)\s+(\w+)\s+BW=.*?DELAY=\d+\s+(.*)")
+DSD_CALL_REGEX = re.compile(r"Freq=([\d.]+)\s+(.*)")
+BRACKET_LABEL_REGEX = re.compile(r"\[([^\]]+)\]")
 
 
 @dataclass(frozen=True)
@@ -168,19 +173,40 @@ class MetadataReader:
 
 def parse_metadata(line):
     if not line:
-        return ScannerMetadata()
+        return None
     match = TUNING_REGEX.search(line)
-    if not match:
-        return ScannerMetadata(raw=line, display=line)
-    frequency, mode, label = match.groups()
-    clean_label = label.strip() or "Unknown_Channel"
-    return ScannerMetadata(
-        raw=line,
-        frequency=frequency,
-        mode=mode,
-        label=clean_label,
-        display=f"{frequency} {clean_label}",
-    )
+    if match:
+        frequency, mode, label = match.groups()
+        clean_label = label.strip() or "Unknown_Channel"
+        return ScannerMetadata(
+            raw=line,
+            frequency=frequency,
+            mode=mode,
+            label=clean_label,
+            display=f"{frequency} {clean_label}",
+        )
+
+    match = DSD_CALL_REGEX.search(line)
+    if match:
+        frequency, details = match.groups()
+        label_match = BRACKET_LABEL_REGEX.search(details)
+        label = label_match.group(1).strip() if label_match else details.strip()
+        label = re.sub(r"\s+\d+s$", "", label).strip(" ;") or "Unknown_Channel"
+        mode = details.split("Group call", 1)[0].split("Private call", 1)[0].strip(" ;") or "DSD"
+        frequency = frequency.rstrip("0").rstrip(".")
+        return ScannerMetadata(
+            raw=line,
+            frequency=frequency,
+            mode=mode,
+            label=label,
+            display=f"{frequency} {label}",
+        )
+
+    return None
+
+
+def metadata_is_known(metadata):
+    return bool(metadata and metadata.frequency != "unknown" and metadata.label != "Unknown_Channel")
 
 
 def sanitize_label(label):
@@ -521,6 +547,10 @@ class AudioMonitor:
 
         active_session = None
         last_log_poll = 0.0
+        high_audio_blocks = 0
+        last_unknown_audio_log = 0.0
+        pre_roll_blocks = max(1, int((samplerate * PRE_ROLL_SEC) / AUDIO_BLOCKSIZE))
+        pre_roll = deque(maxlen=pre_roll_blocks)
         try:
             while not self.stop_event.is_set():
                 now = time.monotonic()
@@ -555,12 +585,33 @@ class AudioMonitor:
                     elif active_session.should_stop_for_silence(now):
                         self._finish_session(active_session, "Silence detected")
                         active_session = None
-                elif level >= AUDIO_TRIGGER_LEVEL:
+                        high_audio_blocks = 0
+                        pre_roll.clear()
+                else:
+                    pre_roll.append(bytes(data))
+                    if level >= AUDIO_TRIGGER_LEVEL:
+                        high_audio_blocks += 1
+                    else:
+                        high_audio_blocks = 0
+
+                    if high_audio_blocks < AUDIO_START_BLOCKS:
+                        continue
+
                     with self.lock:
                         metadata = self.current_metadata
+                    if not metadata_is_known(metadata):
+                        if now - last_unknown_audio_log >= 5.0:
+                            self.callbacks.log("Audio ignored until channel metadata is available")
+                            last_unknown_audio_log = now
+                        high_audio_blocks = 0
+                        continue
+
                     try:
                         active_session = RecordingSession(self.recording_catalog, metadata, samplerate, device_name)
-                        active_session.write(data)
+                        for chunk in pre_roll:
+                            active_session.write(chunk)
+                        pre_roll.clear()
+                        active_session.mark_audio(now)
                         self.callbacks.recording(True)
                         self.callbacks.status("RECORDING")
                         self.callbacks.log(f"Audio detected -> {metadata.display}")
@@ -570,7 +621,10 @@ class AudioMonitor:
                     except Exception as exc:
                         self.callbacks.log(f"Recording start failed: {exc}")
                         active_session = None
+                        pre_roll.clear()
                         time.sleep(0.2)
+                    finally:
+                        high_audio_blocks = 0
 
                 time.sleep(POLL_INTERVAL_SEC)
         finally:
