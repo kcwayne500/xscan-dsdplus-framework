@@ -1,0 +1,75 @@
+; ==========================
+; WASHINGTON PD (NXDN48 RAN10)
+; ==========================
+
+158.8350  NEXEDGE48 BW=6.25 DELAY=6  Washington PD Dispatch
+153.7400  NEXEDGE48 BW=6.25 DELAY=6  Washington PD Units Local
+;153.5750  P25       BW=12.5 DELAY=6  Indiana DNR Conservation Officers
+
+; ==========================
+; DAVIESS COUNTY LAW
+; ==========================
+
+;155.7000  NEXEDGE48 BW=6.25 DELAY=1  Sheriff (NXDN/ENC possible)
+;155.7000  FM  BW=11.0  PL=77.0  DELAY=1  Sheriff Dispatch (Analog only)
+
+
+; ==========================
+; FIRE / EMS (Primary)
+; ==========================
+
+155.6100  FM        BW=11.0 DELAY=6   Washington Fire Dispatch
+155.9250  FM        BW=11.0 DELAY=6   Washington Fire Response/Ops
+155.4225  FM        BW=11.0 DELAY=6   Daviess Fire/EMS Dispatch
+155.8800  FM        BW=11.0 DELAY=3   Odon Fire
+154.8750  FM        BW=11.0 DELAY=3   Montgomery/Cannelburg Fire
+
+
+; ==========================
+; EMA
+; ==========================
+
+;159.1500  FM        BW=11.0 DELAY=2   Daviess EMA
+
+
+; ==========================
+; LOOGOOTEE PUBLIC
+; ==========================
+
+155.0850  FM        BW=11.0 DELAY=3   Loogootee Police/Fire
+
+
+; ==========================
+; USER REQUIRED
+; ==========================
+
+462.5750  FM        BW=12.5 PL=114.8 DELAY=2   GMRS CH16
+;462.6000  FM        BW=12.5 DELAY=2   GMRS CH17 REPEATER
+;462.6750  FM        BW=12.5 DELAY=2   GMRS CH20
+;462.7250  FM        BW=12.5 DELAY=2   GMRS CH22 REPEATER
+
+
+;443.2250  C4FM      BW=12.5 DELAY=8   W9ILS UHF Fusion/EchoLink (Washington IN)
+;147.3150  FM        BW=11.0 PL=107.2 DELAY=6   WA9IN VHF Repeater (Washington IN)
+;146.5200  FM        BW=11.0 DELAY=4   2m National Calling (Simplex)
+;446.0000  FM        BW=11.0 DELAY=4   70cm Calling (Simplex)
+
+
+
+; ==========================
+; MISC 
+; ==========================
+
+;156.2250  FM  BW=11.0  DELAY=2  Daviess County Highway Dept
+;151.0550  FM  BW=11.0  DELAY=2  Washington Street Dept
+155.3400  FM  BW=11.0  DELAY=2  MedFlight / HEMS Air-to-Ground
+
+
+; ==========================
+; AIRPORT (KDCY – Washington, IN)
+; ==========================
+
+;119.0750  AM  BW=25.0  DELAY=2  KDCY AWOS Weather
+;125.6000  AM  BW=8.33  DELAY=2  Evansville Approach/Departure
+;122.8000  AM  BW=12.5  DELAY=3  Washington Airport CTAF/UNICOM
+;121.5000  AM  BW=12.5  DELAY=2  Aviation Emergency Guard

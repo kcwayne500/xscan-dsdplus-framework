@@ -1,0 +1,12 @@
+
+; DSD+ 2.523; P25 data
+;
+; this file is auto-maintained by DSD+
+;
+; editing of this file should be limited to removal of data known to be incorrect or outdated
+
+
+  MHzDecimalPad = 0  ; controls how DSD+ formats all channel frequencies; range = 0 to 6
+
+
+; 0 records

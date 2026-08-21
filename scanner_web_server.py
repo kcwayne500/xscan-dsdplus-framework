@@ -11,8 +11,9 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.environ.get("XSCAN_HOME", os.path.dirname(SCRIPT_DIR))
 WEB_UI_DIR = os.path.join(SCRIPT_DIR, "webui")
-RECORDINGS_DIR = r"C:\DSDPlusFastlane\recordings"
+RECORDINGS_DIR = os.path.join(BASE_DIR, "recordings")
 RECORDINGS_LOG_FILE = os.path.join(RECORDINGS_DIR, "recordings_log.json")
 DISCONNECT_ERRORS = (BrokenPipeError, ConnectionAbortedError, ConnectionResetError)
 
@@ -59,6 +60,8 @@ def _normalize_recording(entry):
     started_at = entry.get("started_at") or ""
     ended_at = entry.get("ended_at") or ""
     duration = _safe_float(entry.get("duration_seconds"))
+    active_audio_seconds = _safe_float(entry.get("active_audio_seconds"))
+    peak_dbfs = _safe_float(entry.get("peak_dbfs"))
     audio_candidates = [
         entry.get("audio_file"),
         entry.get("mp3_file"),
@@ -75,6 +78,9 @@ def _normalize_recording(entry):
         "ended_at": ended_at,
         "started_at_label": started_label,
         "duration_seconds": round(duration, 3) if duration is not None else None,
+        "active_audio_seconds": round(active_audio_seconds, 3) if active_audio_seconds is not None else None,
+        "peak_dbfs": round(peak_dbfs, 1) if peak_dbfs is not None else None,
+        "likely_noise": bool(entry.get("likely_noise", False)),
         "frequency": str(entry.get("frequency") or "unknown"),
         "mode": str(entry.get("mode") or "unknown"),
         "label": str(entry.get("label") or "Unknown_Channel"),

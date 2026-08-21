@@ -1,0 +1,12 @@
+(fftw-3.3.5 fftwf_wisdom #x9e7d4dee #xdb14fed1 #x34bf76a4 #xeb6e8fdf
+  (fftwf_dft_vrank_geq1_register 0 #x10048 #x10048 #x0 #xada6210e #x3d4494a2 #x008fbdb6 #xb7983a5a)
+  (fftwf_codelet_t1fv_8_sse2 0 #x10048 #x10048 #x0 #x6eb377be #x4dac3bbc #x3aeaccaa #x45f8f86f)
+  (fftwf_codelet_t2fv_16_avx 0 #x10048 #x10048 #x0 #x2c37a164 #x1b1f455c #xbf5757be #x59d143b7)
+  (fftwf_codelet_t1fv_64_avx 0 #x10048 #x10048 #x0 #x904e8c6c #x848be2b2 #x67450ae7 #xc41a2044)
+  (fftwf_codelet_t2fv_16_avx 0 #x10048 #x10048 #x0 #x85c6fd1e #xb619bc3c #x5a8d5ed1 #xd691c619)
+  (fftwf_codelet_n2fv_64_avx 0 #x10048 #x10048 #x0 #xa648256e #xc952c5d0 #xcf00595f #xebc32211)
+  (fftwf_codelet_n2fv_16_avx 0 #x10048 #x10048 #x0 #xa8e174bb #x4a12523e #xdc289241 #x5279c265)
+  (fftwf_dft_vrank_geq1_register 0 #x10048 #x10048 #x0 #xc659720c #x341ebf28 #x7404be68 #xcface015)
+  (fftwf_codelet_t1fv_32_avx 0 #x10048 #x10048 #x0 #x3fc2bea4 #x586431be #x98565f1d #x4fb459f6)
+  (fftwf_codelet_n2fv_64_avx 0 #x10048 #x10048 #x0 #x4339e569 #x092b7a58 #xb6359d18 #xc4a21f81)
+)

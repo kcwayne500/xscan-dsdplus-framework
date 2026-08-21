@@ -1,0 +1,36 @@
+; DSD+ networks file
+;
+; you can edit this file while DSD+ is running
+;
+; line format: protocol, networkID, "network name"[, TIIIareaLength]
+;
+;  for TIIIStd and TIIInonStd, add TIII model code (T/S/L/H) before networkID
+;
+;  for TIIIStd, siteNumber format = area.site
+;  for TIIInonStd, siteNumber format = site
+;
+;
+; protocols:
+;
+;  ProVoice
+;  dPMR
+;  IDAS
+;  NEXEDGE48
+;  NEXEDGE96
+;  DMR
+;  TIIIStd
+;  TIIInonStd
+;  DCDM
+;  Cap+
+;  Con+
+;  XPT
+;  P25
+;  X2-TDMA
+;
+;
+; Example:
+;
+;  Con+, 123, "Acme Inc."
+
+P25, BEE00.6BD, "Indiana Project Hoosier SAFE-T"
+

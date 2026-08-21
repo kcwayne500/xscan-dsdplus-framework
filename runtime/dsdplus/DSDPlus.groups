@@ -1,0 +1,67 @@
+
+; DSD+ 2.523; group records
+;
+; this file is populated automatically by DSD+
+;
+; you can edit this file while DSD+ is running
+;
+; line format: protocol, networkID, group, priority, override, hits, timestamp, "group alias"
+;
+;
+; protocols:
+;
+;  ProVoice
+;  dPMR
+;  IDAS
+;  NEXEDGE48
+;  NEXEDGE96
+;  DMR
+;  TIIIStd
+;  TIIInonStd
+;  DCDM
+;  Cap+
+;  Con+
+;  XPT
+;  P25
+;  X2-TDMA
+
+;
+
+NEXEDGE48, 0,         1,          50,  Normal,      37,  2026/06/03 22:02,  ""
+NEXEDGE48, 0,         2,          50,  Normal,       2,  2026/02/17 10:35,  ""
+NEXEDGE48, 0,         3,          50,  Normal,       1,  2026/07/11 10:19,  ""
+NEXEDGE48, 0,         65280,      50,  Normal,       1,  2025/11/11 15:46,  ""
+NEXEDGE48, 0,         65535,      50,  Normal,      10,  2026/07/06  7:03,  ""
+
+;
+
+NEXEDGE96, 0,         16777215,   50,  Normal,       1,  2025/11/12 19:17,  ""
+
+;
+
+DMR,       0,         1,          50,  Normal,      45,  2025/11/13  7:38,  ""
+DMR,       0,         1200,       50,  Normal,      28,  2026/07/29  3:44,  ""
+DMR,       0,         16777199,   50,  Normal,      30,  2026/02/05 13:35,  ""
+DMR,       0,         16777215,   50,  Normal,     742,  2026/01/30 23:07,  ""
+
+;
+
+P25,       0,         2,          50,  Normal,       1,  2026/06/30 22:23,  ""
+P25,       0,         3,          50,  Normal,      24,  2026/08/18  9:08,  ""
+
+; Indiana Project Hoosier SAFE-T
+
+P25,       BEE00.6BD, 21105,      50,  Normal,       0,  0000/00/00  0:00,  "Daviess Sheriff Dispatch"
+P25,       BEE00.6BD, 21106,      60,  Normal,       0,  0000/00/00  0:00,  "Daviess Sheriff TAC 1"
+P25,       BEE00.6BD, 21107,      60,  Normal,       0,  0000/00/00  0:00,  "Daviess Sheriff TAC 2"
+P25,       BEE00.6BD, 21108,      60,  Normal,       0,  0000/00/00  0:00,  "Daviess Sheriff TAC 3"
+P25,       BEE00.6BD, 21109,      70,  Normal,       0,  0000/00/00  0:00,  "Daviess EMA TAC 1"
+P25,       BEE00.6BD, 21110,      70,  Normal,       0,  0000/00/00  0:00,  "Daviess EMA TAC 2"
+P25,       BEE00.6BD, 21111,      70,  Normal,       0,  0000/00/00  0:00,  "Daviess EMA TAC 3"
+P25,       BEE00.6BD, 21112,      60,  Normal,       0,  0000/00/00  0:00,  "Daviess EMS TAC 1"
+P25,       BEE00.6BD, 21113,      60,  Normal,       0,  0000/00/00  0:00,  "Daviess EMS TAC 2"
+P25,       BEE00.6BD, 21114,      55,  Normal,       0,  0000/00/00  0:00,  "Daviess Fire TAC 1"
+P25,       BEE00.6BD, 21115,      55,  Normal,       0,  0000/00/00  0:00,  "Daviess Fire TAC 2"
+P25,       BEE00.6BD, 21116,      55,  Normal,       0,  0000/00/00  0:00,  "Daviess Fire TAC 3"
+
+; 24 records; 12 aliases

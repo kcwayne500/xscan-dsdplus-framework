@@ -23,6 +23,7 @@ SILENCE_HANG_SEC = 1.75
 MIN_RECORD_SEC = 0.90
 PRE_ROLL_SEC = 0.45
 AUDIO_START_BLOCKS = 3
+LIKELY_NOISE_ACTIVE_SEC = 0.50
 POLL_INTERVAL_SEC = 0.02
 LOG_POLL_SEC = 0.05
 
@@ -56,6 +57,9 @@ class RecordingLogEntry:
     wav_file: str
     mp3_file: str
     audio_file: str
+    active_audio_seconds: float = 0.0
+    peak_dbfs: float = -120.0
+    likely_noise: bool = False
 
 
 @dataclass
@@ -360,6 +364,9 @@ class RecordingSession:
         self.started_at_iso = datetime.now().isoformat()
         self.started_at_monotonic = time.monotonic()
         self.last_audio_at = self.started_at_monotonic
+        self.samplerate = samplerate
+        self.active_audio_seconds = 0.0
+        self.peak_level = 0.0
         self.encoder_process, self.encoder_error = catalog.start_mp3_encoder(self.mp3_path, metadata, samplerate)
         if self.encoder_process is None:
             self.wave_file = wave.open(self.wav_path, "wb")
@@ -389,6 +396,15 @@ class RecordingSession:
 
     def mark_audio(self, moment):
         self.last_audio_at = moment
+
+    def observe_level(self, level, block_count=1):
+        self.peak_level = max(self.peak_level, float(level))
+        if level >= AUDIO_TRIGGER_LEVEL:
+            self.active_audio_seconds += (AUDIO_BLOCKSIZE * block_count) / self.samplerate
+
+    def observe_trigger_run(self, block_count, peak_level):
+        self.peak_level = max(self.peak_level, float(peak_level))
+        self.active_audio_seconds += (AUDIO_BLOCKSIZE * block_count) / self.samplerate
 
     def should_stop_for_silence(self, moment):
         return moment - self.last_audio_at >= SILENCE_HANG_SEC
@@ -473,6 +489,9 @@ class AudioMonitor:
             return
         is_mp3 = session.recording_format == "mp3" and not session.encoder_error and os.path.exists(session.mp3_path)
         audio_file = os.path.basename(session.mp3_path if is_mp3 else session.wav_path)
+        active_audio_seconds = round(session.active_audio_seconds, 3)
+        peak_dbfs = round(float(20.0 * np.log10(max(session.peak_level, 1e-6))), 1)
+        likely_noise = active_audio_seconds < LIKELY_NOISE_ACTIVE_SEC
         entry = RecordingLogEntry(
             started_at=session.started_at_iso,
             ended_at=ended_at_iso,
@@ -488,9 +507,13 @@ class AudioMonitor:
             wav_file="" if is_mp3 else os.path.basename(session.wav_path),
             mp3_file=os.path.basename(session.mp3_path),
             audio_file=audio_file,
+            active_audio_seconds=active_audio_seconds,
+            peak_dbfs=peak_dbfs,
+            likely_noise=likely_noise,
         )
         if is_mp3:
-            self.callbacks.log(f"Saved MP3 -> {os.path.basename(session.mp3_path)}")
+            suffix = " (brief/noise-like trigger)" if likely_noise else ""
+            self.callbacks.log(f"Saved MP3 -> {os.path.basename(session.mp3_path)}{suffix}")
         else:
             if session.encoder_error:
                 self.callbacks.log(f"MP3 recording failed: {session.encoder_error}")
@@ -548,6 +571,7 @@ class AudioMonitor:
         active_session = None
         last_log_poll = 0.0
         high_audio_blocks = 0
+        high_audio_peak = 0.0
         last_unknown_audio_log = 0.0
         pre_roll_blocks = max(1, int((samplerate * PRE_ROLL_SEC) / AUDIO_BLOCKSIZE))
         pre_roll = deque(maxlen=pre_roll_blocks)
@@ -580,19 +604,23 @@ class AudioMonitor:
 
                 if active_session is not None:
                     active_session.write(data)
+                    active_session.observe_level(level)
                     if level >= AUDIO_TRIGGER_LEVEL:
                         active_session.mark_audio(now)
                     elif active_session.should_stop_for_silence(now):
                         self._finish_session(active_session, "Silence detected")
                         active_session = None
                         high_audio_blocks = 0
+                        high_audio_peak = 0.0
                         pre_roll.clear()
                 else:
                     pre_roll.append(bytes(data))
                     if level >= AUDIO_TRIGGER_LEVEL:
                         high_audio_blocks += 1
+                        high_audio_peak = max(high_audio_peak, level)
                     else:
                         high_audio_blocks = 0
+                        high_audio_peak = 0.0
 
                     if high_audio_blocks < AUDIO_START_BLOCKS:
                         continue
@@ -611,6 +639,7 @@ class AudioMonitor:
                         for chunk in pre_roll:
                             active_session.write(chunk)
                         pre_roll.clear()
+                        active_session.observe_trigger_run(high_audio_blocks, high_audio_peak)
                         active_session.mark_audio(now)
                         self.callbacks.recording(True)
                         self.callbacks.status("RECORDING")
@@ -625,6 +654,7 @@ class AudioMonitor:
                         time.sleep(0.2)
                     finally:
                         high_audio_blocks = 0
+                        high_audio_peak = 0.0
 
                 time.sleep(POLL_INTERVAL_SEC)
         finally:

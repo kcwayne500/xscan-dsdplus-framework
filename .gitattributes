@@ -1,0 +1,5 @@
+runtime/**/*.exe filter=lfs diff=lfs merge=lfs -text
+runtime/**/*.dll filter=lfs diff=lfs merge=lfs -text
+runtime/dsdplus/** -whitespace
+webui/m2/** -whitespace
+webui/recordings/** -whitespace

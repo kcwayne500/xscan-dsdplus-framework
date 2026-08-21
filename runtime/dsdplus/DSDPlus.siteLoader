@@ -1,0 +1,98 @@
+; DSD+ system/site loader file
+;
+; you can edit this file while DSD+ is running
+;
+;
+; line format:
+;
+;
+;   trunked network entries:
+;
+;     protocol, networkID, 0, "network name"
+;
+;
+;   trunked site entries:
+;
+;     protocol, networkID, siteNumber, "site name"
+;
+;       for TIIIStd and TIIInonStd, add TIII model code (T/S/L/H) before networkID
+;
+;       for TIIIStd, siteNumber format = area.site
+;       for TIIInonStd, siteNumber format = site
+;
+;
+;   conventional channel entries:
+;
+;     Conventional, pseudoNID, pseudoSiteNumber, "frequencyInMHZ protocol channelName"
+;
+;       note: "Conventional" can be shortened to "Conv"
+;
+;       recognized conventional channel protocol names:
+;
+;         Analog  (NFM analog)
+;         FM      (NFM analog)
+;         AM      (AM analog - must be supported by FMPx)
+;         D-Star
+;         Fusion
+;         NXDN48
+;         NXDN96
+;         DMR
+;         DCDM
+;         dPMR
+;         ProVoice
+;
+;
+; trunked site entries can be copied directly from your DSDPlus.sites file
+;
+;
+; frequency data for P25 trunked sites has to be present in the DSDPlus.P25data file;
+;  manually tune to P25 control channels to auto-build the DSDPlus.P25data file
+;
+; frequency data for non-P25 trunked sites has to be present in the DSDPlus.frequencies file;
+;  this data has to be manually added to the DSDPlus.frequencies file by you
+;
+; frequency data for conventional channels must be present
+;  in every conventional channel entry in this file.
+;  Conventional channel data does not have to be added to any other DSD+ data file
+;
+;
+; data for any site or channel can be present more than once,
+;  i.e. favorite / frequently monitored channels/sites could be duplicated at the top of this file
+;
+;
+; examples:
+;
+;  P25, BEE11.123, 0, "Mulberry PS"
+;  P25, BEE11.123, 1.1, "North"
+;  P25, BEE11.123, 2.2, "South"
+;
+;  Con+, 1234, 0, "ACME"
+;  Con+, 1234, 1, "Site 1"
+;  Con+, 1234, 1, "Site 2"
+;
+;  Conv, 1, 1,  "119.150 AM ATIS"
+;  Conv, 1, 2,  "163.830 P25 FBI"
+;  Conv, 1, 3,  "443.900 D-Star"
+;  Conv, 1, 4,  "442.200 Fusion"
+;  Conv, 1, 5,  "462.500 DMR"
+;  Conv, 1, 6,  "455.100 NXDN48"
+;
+;  Conv, 1, 11, "162.550        WX1"
+;  Conv, 1, 12, "162.400        WX2"
+;  Conv, 1, 13, "162.475        WX3"
+;  Conv, 1, 14, "162.425        WX4"
+;  Conv, 1, 15, "162.450        WX5"
+;  Conv, 1, 16, "162.500        WX6"
+;  Conv, 1, 17, "162.525        WX7"
+;  Conv, 1, 18, "161.650        WX8"
+;  Conv, 1, 19, "161.775 Analog WX9"
+;  Conv, 1, 20, "163.275 FM     WX10"
+
+P25, BEE00.6BD, 0,      "Indiana Project Hoosier SAFE-T"
+P25, BEE00.6BD, 2.020,  "Edwardsport"
+P25, BEE00.6BD, 2.022,  "Petersburg"
+P25, BEE00.6BD, 2.023,  "Jasper"
+P25, BEE00.6BD, 2.065,  "Bramble"
+P25, BEE00.6BD, 2.066,  "Shoals"
+P25, BEE00.6BD, 2.067,  "Vincennes"
+

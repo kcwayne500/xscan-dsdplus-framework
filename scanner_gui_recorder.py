@@ -36,9 +36,9 @@ from streaming_support import StreamingManager
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.dirname(SCRIPT_DIR)
-LOG_FILE = r"C:\DSDPlusFastlane\startup\fmp24_scan.log"
-OUTPUT_DIR = r"C:\DSDPlusFastlane\recordings"
+BASE_DIR = os.environ.get("XSCAN_HOME", os.path.dirname(SCRIPT_DIR))
+LOG_FILE = os.path.join(BASE_DIR, "startup", "fmp24_scan_live.log")
+OUTPUT_DIR = os.path.join(BASE_DIR, "recordings")
 LOCAL_FFMPEG_DIR = os.path.join(SCRIPT_DIR, "ffmpeg")
 LOCAL_FFMPEG_EXE = os.path.join(LOCAL_FFMPEG_DIR, "ffmpeg.exe")
 RECORDINGS_LOG_FILE = os.path.join(OUTPUT_DIR, "recordings_log.json")

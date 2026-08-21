@@ -1,0 +1,25 @@
+{
+  "name": "Amplitude Flat Black",
+  "short_name": "Amp Dark",
+  "description": "Standalone AmplitudeJS flat black player demo in /m2/.",
+  "start_url": "/m2/",
+  "scope": "/m2/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "icons": [
+    {
+      "src": "/m/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/m/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

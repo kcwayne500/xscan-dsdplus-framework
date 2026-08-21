@@ -1,0 +1,44 @@
+; DSD+ sites file
+;
+; you can edit this file while DSD+ is running
+;
+; line format: protocol, networkID, siteNumber, "site name"
+;
+;  for TIII, siteNumber format = area.site
+;
+;  for TIIIStd and TIIInonStd, add TIII model code (T/S/L/H) before networkID
+;
+;  for TIIIStd, siteNumber format = area.site
+;  for TIIInonStd, siteNumber format = site
+;
+;
+; protocols:
+;
+;  ProVoice
+;  dPMR
+;  IDAS
+;  NEXEDGE48
+;  NEXEDGE96
+;  DMR
+;  TIIIStd
+;  TIIInonStd
+;  DCDM
+;  Cap+
+;  Con+
+;  XPT
+;  P25
+;  X2-TDMA
+;
+;
+; Example:
+;
+;  Con+, 123, 1, "East Site"
+;  Con+, 123, 2, "West Site"
+
+P25, BEE00.6BD, 2.020, "Edwardsport"
+P25, BEE00.6BD, 2.022, "Petersburg"
+P25, BEE00.6BD, 2.023, "Jasper"
+P25, BEE00.6BD, 2.065, "Bramble"
+P25, BEE00.6BD, 2.066, "Shoals"
+P25, BEE00.6BD, 2.067, "Vincennes"
+

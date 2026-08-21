@@ -1,0 +1,53 @@
+; DSD+ frequency file
+;
+;
+; entries in this file are used to:
+;
+;  a) identify systems and sites when FMP24/FMPA/FMPP tunes to their RF channels
+;
+;  b) match OTA channel numbers broadcast by rest/control channels to their radio frequencies
+;
+;
+; you can edit this file while DSD+ is running
+;
+;
+; line format:
+;
+;  protocol, networkID, siteNumber, OTAchannelNumber, TXfrequency, RXfrequency, sortOrder
+;
+;  for TIIIStd and TIIInonStd, add TIII model code (T/S/L/H) before networkID
+;
+;  for TIIIStd, siteNumber format = area.site
+;  for TIIInonStd, siteNumber format = site
+;
+;
+;   use site number = 0 for network-wide definition
+;
+;   use 0.0 for unknown frequencies
+;
+;   use sort order = 0 to sort by OTA channel number
+;
+;
+; protocols:
+;
+;  D-Star
+;  Fusion
+;  IDAS
+;  NEXEDGE48
+;  NEXEDGE96
+;  dPMR
+;  DMR
+;  Cap+
+;  Con+
+;  TIIIStd
+;  TIIInonStd
+;  XPT
+;  P25  (conventional channels only)
+;  ProVoice
+;
+;
+; Example:
+;
+;  Con+, 123, 1, 9, 462.8125, 467.8125, 0
+
+

@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scanner Recordings</title>
+<style>
+@font-face {
+    font-family: 'PixelSplitter';
+    font-style: normal;
+    font-display: swap;
+    font-weight: 700;
+    src: url('/fonts/PixelSplitter-Bold.ttf') format('truetype')
+}
+:root {
+    --bg:#11161c;
+    --panel:#1a212b;
+    --panel2:#202936;
+    --line:#334155;
+    --muted:#94a3b8;
+    --text:#e5edf5;
+    --lcd:#d7e2af;
+    --lcdfg:#1f2916;
+    --lcdb:#95a46c;
+    --accent:#93c5fd;
+    --ok:#22c55e;
+    --warn:#f59e0b;
+    --bad:#f87171;
+}
+* { box-sizing:border-box }
+body {
+    margin:0;
+    background:radial-gradient(circle at top, #1b2430 0%, var(--bg) 60%);
+    color:var(--text);
+    font-family:"Segoe UI", Tahoma, sans-serif;
+}
+.shell {
+    max-width:1160px;
+    margin:0 auto;
+    padding:18px;
+}
+.topnav {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-bottom:14px;
+}
+.navtitle {
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--muted);
+}
+.navlinks {
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+}
+.pagelink {
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    text-decoration:none;
+    color:var(--text);
+    padding:10px 14px;
+    border-radius:12px;
+    border:1px solid var(--line);
+    background:linear-gradient(180deg,#243244,#18222f);
+    font-size:14px;
+    font-weight:700;
+}
+.pagelink.active {
+    background:linear-gradient(180deg,#1f4f38,#163928);
+    border-color:#3d8b65;
+}
+.card {
+    background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:14px 16px;
+    box-shadow:0 14px 34px rgba(0,0,0,.28);
+}
+.label {
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:8px;
+}
+.lcdshell {
+    background:linear-gradient(180deg,#dfe8bb,var(--lcd));
+    color:var(--lcdfg);
+    border:3px solid var(--lcdb);
+    border-radius:20px;
+    padding:14px 18px 16px;
+    box-shadow:inset 0 2px 8px rgba(255,255,255,.16), inset 0 -6px 14px rgba(112,129,66,.18);
+    margin-bottom:14px;
+}
+.lcdchips, .playerchips {
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+}
+.lcdchip {
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:4px 10px;
+    border:1px solid rgba(31,41,22,.22);
+    border-radius:999px;
+    background:rgba(255,255,255,.18);
+    white-space:nowrap;
+    font-family:"PixelSplitter", Consolas, monospace;
+    text-transform:uppercase;
+}
+.lcdchip .tiny {
+    font-size:11px;
+    opacity:.7;
+}
+.lcdchip .value {
+    display:inline-block;
+}
+.hero {
+    font-family:"PixelSplitter", Consolas, monospace;
+    font-size:clamp(20px,2.6vw,32px);
+    line-height:1.05;
+    margin-top:10px;
+}
+.subhero {
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-top:12px;
+    font-family:"PixelSplitter", Consolas, monospace;
+    font-size:12px;
+    text-transform:uppercase;
+    opacity:.88;
+}
+.filtergrid {
+    display:grid;
+    grid-template-columns:repeat(6, minmax(0, 1fr));
+    gap:12px;
+}
+.field {
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+.field label {
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--muted);
+}
+.field input, .field select {
+    width:100%;
+    padding:10px 12px;
+    border-radius:12px;
+    border:1px solid #314257;
+    background:#0f1620;
+    color:var(--text);
+}
+.field.searchfield {
+    grid-column:span 2;
+}
+.filteractions {
+    display:flex;
+    gap:10px;
+    align-items:flex-end;
+}
+.btn {
+    appearance:none;
+    border:1px solid var(--line);
+    background:linear-gradient(180deg,#243244,#18222f);
+    color:var(--text);
+    border-radius:12px;
+    padding:10px 14px;
+    min-width:86px;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+}
+.btn.primary {
+    background:linear-gradient(180deg,#1f4f38,#163928);
+    border-color:#3d8b65;
+}
+.layout {
+    display:grid;
+    grid-template-columns:360px minmax(0, 1fr);
+    gap:14px;
+    margin-top:14px;
+}
+.playerpanel {
+    position:sticky;
+    top:18px;
+    height:max-content;
+}
+.playerhead {
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    align-items:flex-start;
+    margin-bottom:12px;
+}
+.playerlabel {
+    font-family:"PixelSplitter", Consolas, monospace;
+    font-size:22px;
+    line-height:1.05;
+}
+.badge {
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:7px 11px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:rgba(15,23,32,.9);
+    color:var(--muted);
+    font-size:13px;
+    font-weight:600;
+}
+.badge.ok { color:#b8f08e; }
+.badge.warn { color:#ffd699; }
+.badge.bad { color:#ffb1b1; }
+.playeraudio {
+    width:100%;
+    margin:10px 0 14px;
+}
+.playermeta {
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0,1fr));
+    gap:10px;
+    margin-bottom:14px;
+}
+.metabox {
+    padding:10px 12px;
+    border-radius:12px;
+    border:1px solid #314257;
+    background:#10161f;
+}
+.metabox .name {
+    font-size:10px;
+    letter-spacing:.13em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:5px;
+}
+.metabox .value {
+    font-size:14px;
+    font-weight:700;
+}
+.playercontrols {
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+}
+.playernote {
+    color:var(--muted);
+    font-size:13px;
+}
+.listpanel {
+    min-width:0;
+}
+.listhead {
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    align-items:center;
+    margin-bottom:12px;
+}
+.counttext {
+    color:var(--muted);
+    font-size:13px;
+}
+.recordings {
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+.recording {
+    border:1px solid #314257;
+    border-radius:14px;
+    padding:12px 14px;
+    background:linear-gradient(180deg,#111823,#0d131c);
+    cursor:pointer;
+}
+.recording.selected {
+    border-color:#3d8b65;
+    box-shadow:0 0 0 1px rgba(61,139,101,.28);
+}
+.recording.playing {
+    border-color:#93c5fd;
+    box-shadow:0 0 0 1px rgba(147,197,253,.25);
+}
+.recordinghead, .recordingmeta, .recordingactions {
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    align-items:center;
+}
+.recordingtitle {
+    font-weight:800;
+    font-size:16px;
+}
+.recordingstamp {
+    color:var(--muted);
+    font-size:13px;
+}
+.recordingmeta {
+    margin-top:8px;
+    color:var(--muted);
+    font-size:13px;
+}
+.recordingactions {
+    margin-top:10px;
+}
+.mini {
+    padding:8px 12px;
+    min-width:auto;
+    font-size:13px;
+}
+.empty {
+    padding:24px;
+    border-radius:14px;
+    border:1px dashed #41546d;
+    color:var(--muted);
+    text-align:center;
+}
+@media (max-width:980px) {
+    .filtergrid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    .field.searchfield { grid-column:span 2; }
+    .layout { grid-template-columns:1fr; }
+    .playerpanel { position:static; }
+}
+@media (max-width:640px) {
+    .filtergrid { grid-template-columns:1fr; }
+    .field.searchfield { grid-column:span 1; }
+    .playermeta { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+    <div class="topnav">
+        <div class="navtitle">Scanner Pages</div>
+        <div class="navlinks">
+            <a class="pagelink" href="/">Live</a>
+            <a class="pagelink active" href="/recordings/">Recordings</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="label">Historic Audio Browser</div>
+        <div class="lcdshell">
+            <div class="lcdchips playerchips">
+                <div class="lcdchip"><span class="tiny">View</span><span class="value">Archive</span></div>
+                <div class="lcdchip"><span class="tiny">Order</span><span class="value">Newest First</span></div>
+                <div class="lcdchip"><span class="tiny">Mode</span><span class="value" id="modeSummary">Any</span></div>
+                <div class="lcdchip"><span class="tiny">Results</span><span class="value" id="countSummary">0</span></div>
+            </div>
+            <div class="hero" id="heroTitle">Historic scanner traffic</div>
+            <div class="subhero">
+                <div id="heroSubtext">Search and replay previous transmissions</div>
+                <div id="heroTimestamp">Updated --:--:--</div>
+            </div>
+        </div>
+
+        <div class="label">Search And Filters</div>
+        <form class="filtergrid" id="filterForm">
+            <div class="field searchfield">
+                <label for="searchInput">Search</label>
+                <input id="searchInput" name="search" type="text" placeholder="Label, frequency, mode, device, raw log...">
+            </div>
+            <div class="field">
+                <label for="frequencyInput">Frequency</label>
+                <input id="frequencyInput" name="frequency" type="text" placeholder="155.34">
+            </div>
+            <div class="field">
+                <label for="modeInput">Mode</label>
+                <input id="modeInput" name="mode" type="text" placeholder="P25, FM, NXDN...">
+            </div>
+            <div class="field">
+                <label for="labelInput">Label</label>
+                <input id="labelInput" name="label" type="text" placeholder="Dispatch">
+            </div>
+            <div class="field">
+                <label for="startedFromInput">From</label>
+                <input id="startedFromInput" name="started_from" type="datetime-local">
+            </div>
+            <div class="field">
+                <label for="startedToInput">To</label>
+                <input id="startedToInput" name="started_to" type="datetime-local">
+            </div>
+            <div class="field">
+                <label for="minDurationInput">Min Seconds</label>
+                <input id="minDurationInput" name="min_duration" type="number" min="0" step="0.1" placeholder="0">
+            </div>
+            <div class="field">
+                <label for="maxDurationInput">Max Seconds</label>
+                <input id="maxDurationInput" name="max_duration" type="number" min="0" step="0.1" placeholder="120">
+            </div>
+            <div class="filteractions">
+                <button class="btn primary" type="submit">Apply</button>
+                <button class="btn" type="button" id="clearFiltersButton">Clear</button>
+            </div>
+        </form>
+
+        <div class="layout">
+            <div class="card playerpanel">
+                <div class="label">Selected Recording</div>
+                <div class="playerhead">
+                    <div class="playerlabel" id="playerLabel">No transmission selected</div>
+                    <div class="badge" id="playerAvailability">Select an item</div>
+                </div>
+                <audio id="historyAudio" class="playeraudio" controls preload="none"></audio>
+                <div class="playercontrols">
+                    <button class="btn" type="button" id="prevButton">Previous</button>
+                    <button class="btn" type="button" id="nextButton">Next</button>
+                </div>
+                <div class="playermeta">
+                    <div class="metabox"><div class="name">Started</div><div class="value" id="metaStarted">--</div></div>
+                    <div class="metabox"><div class="name">Duration</div><div class="value" id="metaDuration">--</div></div>
+                    <div class="metabox"><div class="name">Frequency</div><div class="value" id="metaFrequency">--</div></div>
+                    <div class="metabox"><div class="name">Mode</div><div class="value" id="metaMode">--</div></div>
+                    <div class="metabox"><div class="name">Device</div><div class="value" id="metaDevice">--</div></div>
+                    <div class="metabox"><div class="name">Stop</div><div class="value" id="metaStop">--</div></div>
+                </div>
+                <div class="playernote" id="playerRaw">Choose a recording to inspect metadata and replay the audio.</div>
+            </div>
+
+            <div class="card listpanel">
+                <div class="label">Archive</div>
+                <div class="listhead">
+                    <div class="counttext" id="resultsText">Loading recordings...</div>
+                    <div class="counttext" id="queueHint">Newest transmissions first</div>
+                </div>
+                <div class="recordings" id="recordingsList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+const recordingsList = document.getElementById('recordingsList');
+const resultsText = document.getElementById('resultsText');
+const countSummary = document.getElementById('countSummary');
+const heroTitle = document.getElementById('heroTitle');
+const heroSubtext = document.getElementById('heroSubtext');
+const heroTimestamp = document.getElementById('heroTimestamp');
+const modeSummary = document.getElementById('modeSummary');
+const historyAudio = document.getElementById('historyAudio');
+const prevButton = document.getElementById('prevButton');
+const nextButton = document.getElementById('nextButton');
+const playerLabel = document.getElementById('playerLabel');
+const playerAvailability = document.getElementById('playerAvailability');
+const metaStarted = document.getElementById('metaStarted');
+const metaDuration = document.getElementById('metaDuration');
+const metaFrequency = document.getElementById('metaFrequency');
+const metaMode = document.getElementById('metaMode');
+const metaDevice = document.getElementById('metaDevice');
+const metaStop = document.getElementById('metaStop');
+const playerRaw = document.getElementById('playerRaw');
+const filterForm = document.getElementById('filterForm');
+const clearFiltersButton = document.getElementById('clearFiltersButton');
+
+let items = [];
+let selectedIndex = -1;
+let playingId = '';
+
+function formatDuration(seconds) {
+    if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) return '--';
+    return `${Number(seconds).toFixed(1)}s`;
+}
+
+function setAvailability(text, tone) {
+    playerAvailability.textContent = text;
+    playerAvailability.className = `badge${tone ? ' ' + tone : ''}`;
+}
+
+function updateHero(count) {
+    countSummary.textContent = String(count);
+    heroTimestamp.textContent = 'Updated ' + new Date().toLocaleTimeString();
+    heroSubtext.textContent = count ? 'Browse and replay historic transmissions' : 'No recordings matched the current filters';
+}
+
+function buildQuery() {
+    const formData = new FormData(filterForm);
+    const params = new URLSearchParams();
+    for (const [key, value] of formData.entries()) {
+        const trimmed = String(value).trim();
+        if (trimmed) params.set(key, trimmed);
+    }
+    params.set('limit', '250');
+    return params;
+}
+
+function selectRecording(index, autoplay=false) {
+    selectedIndex = index;
+    const item = items[index];
+    if (!item) {
+        playerLabel.textContent = 'No transmission selected';
+        setAvailability('Select an item', '');
+        historyAudio.removeAttribute('src');
+        historyAudio.load();
+        metaStarted.textContent = '--';
+        metaDuration.textContent = '--';
+        metaFrequency.textContent = '--';
+        metaMode.textContent = '--';
+        metaDevice.textContent = '--';
+        metaStop.textContent = '--';
+        playerRaw.textContent = 'Choose a recording to inspect metadata and replay the audio.';
+        renderList();
+        updateNavButtons();
+        return;
+    }
+    playerLabel.textContent = item.label || 'Unknown Channel';
+    setAvailability(item.file_exists ? 'Ready to play' : 'File missing', item.file_exists ? 'ok' : 'bad');
+    metaStarted.textContent = item.started_at_label || '--';
+    metaDuration.textContent = formatDuration(item.duration_seconds);
+    metaFrequency.textContent = item.frequency || '--';
+    metaMode.textContent = item.mode || '--';
+    metaDevice.textContent = item.audio_device || '--';
+    metaStop.textContent = item.stop_reason || '--';
+    playerRaw.textContent = item.raw_log_line || 'No raw log line available.';
+    if (item.file_exists && item.playable_url) {
+        historyAudio.src = item.playable_url;
+        if (autoplay) {
+            historyAudio.play().catch(() => {});
+        }
+    } else {
+        historyAudio.removeAttribute('src');
+        historyAudio.load();
+    }
+    renderList();
+    updateNavButtons();
+}
+
+function updateNavButtons() {
+    prevButton.disabled = selectedIndex <= 0;
+    nextButton.disabled = selectedIndex < 0 || selectedIndex >= items.length - 1;
+}
+
+function renderList() {
+    recordingsList.innerHTML = '';
+    if (!items.length) {
+        recordingsList.innerHTML = '<div class="empty">No recordings matched the current filters.</div>';
+        return;
+    }
+    items.forEach((item, index) => {
+        const card = document.createElement('div');
+        const selected = index === selectedIndex;
+        const playing = item.id === playingId;
+        card.className = `recording${selected ? ' selected' : ''}${playing ? ' playing' : ''}`;
+        card.innerHTML = `
+            <div class="recordinghead">
+                <div class="recordingtitle">${item.label || 'Unknown Channel'}</div>
+                <div class="recordingstamp">${item.started_at_label || '--'}</div>
+            </div>
+            <div class="recordingmeta">
+                <span>${item.frequency || '--'}</span>
+                <span>${item.mode || '--'}</span>
+                <span>${formatDuration(item.duration_seconds)}</span>
+                <span>${item.audio_device || 'Unknown device'}</span>
+            </div>
+            <div class="recordingactions">
+                <div class="counttext">${item.file_exists ? (playing ? 'Playing now' : 'Available') : 'Missing file'}</div>
+                <button class="btn mini" type="button" ${item.file_exists ? '' : 'disabled'}>${playing ? 'Pause' : 'Play'}</button>
+            </div>
+        `;
+        card.addEventListener('click', () => selectRecording(index, false));
+        card.querySelector('button').addEventListener('click', (event) => {
+            event.stopPropagation();
+            selectRecording(index, true);
+        });
+        recordingsList.appendChild(card);
+    });
+}
+
+async function loadRecordings() {
+    resultsText.textContent = 'Loading recordings...';
+    try {
+        const params = buildQuery();
+        const response = await fetch(`/api/recordings?${params.toString()}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        items = Array.isArray(payload.items) ? payload.items : [];
+        resultsText.textContent = `${payload.total || 0} recording${payload.total === 1 ? '' : 's'} shown`;
+        modeSummary.textContent = (params.get('mode') || 'Any').toUpperCase();
+        updateHero(payload.total || 0);
+        const currentId = selectedIndex >= 0 && items[selectedIndex] ? items[selectedIndex].id : '';
+        const nextIndex = items.findIndex(item => item.id === currentId);
+        if (nextIndex >= 0) {
+            selectRecording(nextIndex, false);
+        } else if (items.length) {
+            selectRecording(0, false);
+        } else {
+            selectRecording(-1, false);
+        }
+        heroTitle.textContent = items.length ? (items[0].label || 'Historic scanner traffic') : 'Historic scanner traffic';
+        renderList();
+    } catch (error) {
+        items = [];
+        selectRecording(-1, false);
+        resultsText.textContent = 'Failed to load recordings';
+        recordingsList.innerHTML = '<div class="empty">The recordings list could not be loaded.</div>';
+        updateHero(0);
+    }
+}
+
+filterForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    loadRecordings();
+});
+
+clearFiltersButton.addEventListener('click', () => {
+    filterForm.reset();
+    loadRecordings();
+});
+
+prevButton.addEventListener('click', () => {
+    if (selectedIndex > 0) selectRecording(selectedIndex - 1, true);
+});
+
+nextButton.addEventListener('click', () => {
+    if (selectedIndex >= 0 && selectedIndex < items.length - 1) selectRecording(selectedIndex + 1, true);
+});
+
+historyAudio.addEventListener('play', () => {
+    const item = items[selectedIndex];
+    playingId = item ? item.id : '';
+    setAvailability('Playing', 'ok');
+    renderList();
+});
+
+historyAudio.addEventListener('pause', () => {
+    const item = items[selectedIndex];
+    if (item && !historyAudio.ended) {
+        setAvailability(item.file_exists ? 'Paused' : 'File missing', item.file_exists ? 'warn' : 'bad');
+    }
+    playingId = '';
+    renderList();
+});
+
+historyAudio.addEventListener('ended', () => {
+    playingId = '';
+    const item = items[selectedIndex];
+    setAvailability(item && item.file_exists ? 'Ready to play' : 'File missing', item && item.file_exists ? 'ok' : 'bad');
+    renderList();
+});
+
+historyAudio.addEventListener('error', () => {
+    setAvailability('Playback failed', 'bad');
+});
+
+loadRecordings();
+</script>
+</body>
+</html>
+

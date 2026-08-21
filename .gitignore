@@ -5,8 +5,10 @@ __pycache__/
 build/
 dist/
 *.spec
-recordings/
-ffmpeg/
-scanner_gui_recorder_settings.json
+/recordings/
+/ffmpeg/
+/scanner_gui_recorder_settings.json
 .DS_Store
 Thumbs.db
+install.log
+.venv/

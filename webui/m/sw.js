@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'scanner-mobile-v1';
+﻿const CACHE_NAME = 'scanner-mobile-v2';
 const APP_SHELL = [
   '/m/',
   '/m/index.html',

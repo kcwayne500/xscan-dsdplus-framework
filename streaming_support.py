@@ -8,7 +8,62 @@ import time
 STREAM_NAME = "scanner"
 STREAM_RTSP_PORT = 8554
 STREAM_WEBRTC_PORT = 8889
+STREAM_WEBRTC_UDP_PORT = 8189
 STREAM_AUDIO_BITRATE = "48k"
+PUBLIC_WEBRTC_HOST = os.environ.get("XSCAN_PUBLIC_HOST", "xscan.cc-group.org")
+
+
+def get_listening_pids(port):
+    try:
+        result = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, text=True, timeout=5)
+    except Exception:
+        return []
+    pids = []
+    needle = f":{port}"
+    for line in result.stdout.splitlines():
+        if needle not in line or "LISTENING" not in line.upper():
+            continue
+        parts = line.split()
+        if not parts:
+            continue
+        try:
+            pid = int(parts[-1])
+        except (TypeError, ValueError):
+            continue
+        if pid not in pids:
+            pids.append(pid)
+    return pids
+
+
+def get_process_name(pid):
+    try:
+        result = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"], capture_output=True, text=True, timeout=5)
+    except Exception:
+        return ""
+    lines = (result.stdout or "").strip().splitlines()
+    if not lines:
+        return ""
+    first = lines[0].strip()
+    if not first or first.startswith("INFO:"):
+        return ""
+    return first.split('","', 1)[0].strip('"').lower()
+
+
+def release_stale_listener(port, log_func):
+    allowed = {"python.exe", "pythonw.exe", "dsdplusscannerrecorder.exe", "mediamtx.exe", "ffmpeg.exe"}
+    released = False
+    for pid in get_listening_pids(port):
+        name = get_process_name(pid)
+        if name not in allowed:
+            continue
+        try:
+            subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True, text=True, timeout=5)
+            released = True
+            log_func(f"Released stale listener on port {port} from PID {pid} ({name})")
+        except Exception:
+            pass
+    if released:
+        time.sleep(0.6)
 
 
 def get_preferred_lan_ip():
@@ -34,13 +89,14 @@ def get_preferred_lan_ip():
 
 def build_mediamtx_config():
     hosts = []
-    for host in ("127.0.0.1", get_preferred_lan_ip()):
+    for host in ("127.0.0.1", get_preferred_lan_ip(), PUBLIC_WEBRTC_HOST):
         if host and host not in hosts:
             hosts.append(host)
     lines = [
         "logLevel: warn",
         f"rtspAddress: :{STREAM_RTSP_PORT}",
         f"webrtcAddress: :{STREAM_WEBRTC_PORT}",
+        f"webrtcLocalUDPAddress: :{STREAM_WEBRTC_UDP_PORT}",
         "hls: no",
         "rtmp: no",
         "api: no",
@@ -135,6 +191,8 @@ class StreamingManager:
             self.log_func("Live streaming unavailable because ffmpeg was not found")
             return False
         self.stop(log_message=False)
+        release_stale_listener(STREAM_RTSP_PORT, self.log_func)
+        release_stale_listener(STREAM_WEBRTC_PORT, self.log_func)
         with self.lock:
             os.makedirs(self.mediamtx_dir, exist_ok=True)
             with open(self.mediamtx_config, "w", encoding="utf-8") as f:

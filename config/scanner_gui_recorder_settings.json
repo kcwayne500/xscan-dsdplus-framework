@@ -1,0 +1,7 @@
+{
+  "auto_start_on_open": true,
+  "minimize_to_tray": true,
+  "audio_device_name": "CABLE Output (VB-Audio Virtual ",
+  "audio_device_index": 1,
+  "streaming_enabled": true
+}
