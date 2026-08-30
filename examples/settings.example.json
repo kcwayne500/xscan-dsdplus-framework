@@ -1,0 +1,23 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8891,
+    "public_https_enabled": false,
+    "public_url": ""
+  },
+  "runtime": {
+    "hardware_control_enabled": false,
+    "dsdplus_args": ["-r1", "-m2", "-i20001"],
+    "fmp24_args": ["-i0", "-o20001", "-s1", "-g32.8", "-e1", "-P0.0", "-f162.5500"]
+  },
+  "audio": {
+    "device_name": "CABLE Output (VB-Audio Virtual Cable)",
+    "device_host_api": "Windows WASAPI",
+    "trigger_level": 0.0021,
+    "silence_hang_seconds": 1.5
+  },
+  "tools": {
+    "ffmpeg": "C:\\Users\\YOUR_NAME\\AppData\\Local\\Programs\\XScanDependencies\\ffmpeg\\bin\\ffmpeg.exe",
+    "mediamtx": "C:\\Users\\YOUR_NAME\\AppData\\Local\\Programs\\XScanDependencies\\mediamtx\\mediamtx.exe"
+  }
+}

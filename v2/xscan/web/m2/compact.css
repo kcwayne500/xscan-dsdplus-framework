@@ -1,0 +1,119 @@
+/* Dense M2 layout: prioritize the scanner controls at narrow window sizes. */
+.app-shell {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 2px 2px calc(3px + var(--safe-bottom));
+  gap: 4px;
+}
+.topbar { height: 31px; }
+.brand strong { font-size: 14px; }
+.status-pill, .install-button, .live-chip { min-height: 25px; padding: 0 7px; }
+.lcd-panel { min-height: 124px; border-radius: 11px; padding: 6px 8px; }
+.lcd-frequency { margin-top: 4px; font-size: clamp(30px, 10vw, 43px); }
+.lcd-channel { height: 30px; margin-top: 3px; font-size: clamp(16px, 5vw, 22px); }
+.lcd-bottomline { margin-top: 3px; }
+.lcd-panel.recording {
+  color: #3b0810;
+  background: linear-gradient(145deg, #ffc0c3, #e36b76 52%, #b92f43);
+  border-color: #7c1728;
+  box-shadow: inset 0 0 26px #710f244d, 0 0 22px #ed52634f, 0 10px 24px #0007;
+}
+.status-pill.replay {
+  color: #c8b9ff;
+  border-color: #7060a8;
+  background: #18152a;
+}
+.status-pill.replay i {
+  background: #9d86ee;
+  box-shadow: 0 0 13px #a98fff99;
+}
+/* Historical always wins over the live recording color while a stored call is loaded. */
+.lcd-panel.replay {
+  color: #241a4b;
+  background: linear-gradient(145deg, #ddd7ff, #aaa1e3 52%, #8178bf);
+  border-color: #62559c;
+  box-shadow: inset 0 0 26px #43347742, 0 0 22px #947de34d, 0 10px 24px #0007;
+}
+.tabs { padding: 2px; border-radius: 10px; }
+.tab { min-height: 29px; font-size: 10px; }
+.tab span { height: 18px; min-width: 18px; }
+.tab-panel { gap: 4px; }
+.panel { padding: 6px; border-radius: 10px; }
+.panel-heading h1 { font-size: 14px; }
+.audio-meter { height: 45px; margin-top: 5px; padding: 4px; border-radius: 8px; }
+.meter-scale { margin-top: 3px; }
+.listen-panel { gap: 5px; }
+.listen-button { min-height: 47px; border-radius: 9px; }
+.listen-button strong { font-size: 14px; }
+.listen-button small { font-size: 10px; }
+.session-message { font-size: 10px; }
+.volume-row { gap: 6px; }
+.readout-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #0d151d;
+}
+.readout, .readout.wide { grid-column: auto; border: 0; border-radius: 0; background: transparent; padding: 5px 6px; }
+.readout strong { font-size: 10px; }
+.readout:not(:last-child) { border-right: 1px solid var(--line); }
+.call-tape { height: 90px; margin-top: 8px; }
+.sequence-tape {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: clamp(3px, 1.35vw, 7px);
+  padding: 12px 11px 10px;
+  background: linear-gradient(180deg, #071017, #0c171f);
+}
+.sequence-tape:after { content: none; }
+.call-notch {
+  position: relative;
+  flex: 1 1 6px;
+  min-width: 4px;
+  max-width: 10px;
+  border: 0;
+  border-radius: 4px 4px 2px 2px;
+  padding: 0;
+  color: transparent;
+  background: var(--green);
+  box-shadow: 0 0 8px #40d4943d;
+  cursor: pointer;
+}
+.call-notch.medium { background: var(--blue); }
+.call-notch.long { background: var(--amber); }
+.call-notch.very-long { background: var(--red); }
+.call-notch.selected {
+  background: #a994f3;
+  outline: 2px solid #e5ddff;
+  outline-offset: 3px;
+  box-shadow: 0 0 16px #a58df0c7;
+}
+.history-loaded .tab.active,
+.history-loaded .selected-call,
+.recent-call.selected {
+  border-color: #7464ac;
+  background: linear-gradient(180deg, #211d36, #151428);
+  box-shadow: inset 0 0 0 1px #aa98ed26, 0 0 18px #8b72d326;
+}
+.history-loaded .replay-button,
+.history-loaded .listen-button {
+  color: #1d143d;
+  background: linear-gradient(#c9bcff, #9884e1);
+}
+.history-loaded .micro-label { color: #b4a4ef; }
+.selected-call h2 { font-size: 16px; }
+.recent-calls { gap: 5px; }
+.recent-call { padding: 8px 10px; border-radius: 12px; }
+.listen-button:disabled, .replay-button:disabled, .live-chip:disabled {
+  cursor: not-allowed;
+  filter: grayscale(.7);
+  opacity: .46;
+}
+@media (max-width: 380px) {
+  .app-shell { padding-left: 2px; padding-right: 2px; }
+  .lcd-frequency { font-size: 34px; }
+  .audio-meter { gap: 2px; }
+}

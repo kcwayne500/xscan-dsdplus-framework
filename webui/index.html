@@ -1,0 +1,1118 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Scanner Live</title>
+    <style>
+        :root {
+            --bg: #11161c;
+            --panel: #1a212b;
+            --panel2: #202936;
+            --line: #334155;
+            --muted: #94a3b8;
+            --text: #e5edf5;
+            --lcd: #d7e2af;
+            --lcdfg: #1f2916;
+            --lcdb: #95a46c;
+            --ok: #22c55e;
+            --accent: #93c5fd
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            background: radial-gradient(circle at top, #1b2430 0%, var(--bg) 60%);
+            color: var(--text);
+            font-family: "Segoe UI", Tahoma, sans-serif
+        }
+
+        .shell {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 18px
+        }
+
+        .topnav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px
+        }
+
+        .navtitle {
+            font-size: 11px;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            color: var(--muted)
+        }
+
+        .navlinks {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap
+        }
+
+        .pagelink {
+            display: inline-flex;
+            align-items: center;
+            text-decoration: none;
+            color: var(--text);
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            background: linear-gradient(180deg, #243244, #18222f);
+            font-size: 14px;
+            font-weight: 700
+        }
+
+        .pagelink.active {
+            background: linear-gradient(180deg, #1f4f38, #163928);
+            border-color: #3d8b65
+        }
+
+        .card {
+            background: linear-gradient(180deg, var(--panel2), var(--panel));
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 14px 16px;
+            box-shadow: 0 14px 34px rgba(0, 0, 0, .28)
+        }
+
+        .label {
+            font-size: 11px;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 8px
+        }
+
+        .lcdshell {
+            background: linear-gradient(180deg, #dfe8bb, var(--lcd));
+            color: var(--lcdfg);
+            border: 3px solid var(--lcdb);
+            border-radius: 20px;
+            padding: 14px 18px 16px;
+            box-shadow: inset 0 2px 8px rgba(255, 255, 255, .16), inset 0 -6px 14px rgba(112, 129, 66, .18);
+            margin-bottom: 14px
+        }
+
+        .lcdshell.recording {
+            background: linear-gradient(180deg, #e6b6aa, #d99d92);
+            border-color: #b57171;
+            color: #4c1717
+        }
+
+        .lcdtop,
+        .lcdbottom {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            font-family: Consolas, "Lucida Console", monospace;
+            text-transform: uppercase
+        }
+
+        .lcdtop {
+            font-size: 13px;
+            letter-spacing: .08em;
+            opacity: .9;
+            margin-bottom: 8px
+        }
+
+        .lcdbottom {
+            font-size: 12px;
+            letter-spacing: .07em;
+            margin-top: 10px;
+            opacity: .88
+        }
+
+        .lcdmain {
+            font-family: Consolas, "Lucida Console", monospace;
+            font-size: clamp(18px, 2.3vw, 28px);
+            line-height: 1.05;
+            font-weight: 400;
+            letter-spacing: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, .35)
+        }
+
+        .lcdchips {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap
+        }
+
+        .lcdchip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            padding: 3px 10px;
+            border: 1px solid rgba(31, 41, 22, .22);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .18);
+            white-space: nowrap;
+            flex: 0 0 auto
+        }
+
+        .lcdchip .tiny {
+            font-size: 11px;
+            opacity: .7;
+            flex: 0 0 auto
+        }
+
+        .lcdchip .value {
+            display: inline-block;
+            flex: 0 0 auto;
+            overflow: hidden
+        }
+
+        .lcdchip.mode .value {
+            width: 10ch
+        }
+
+        .lcdchip.freq .value {
+            width: 8ch
+        }
+
+        .lcdchip.system .value {
+            width: 8ch
+        }
+
+        .lcdchip.record .value {
+            width: 3ch
+        }
+
+        .lcdchip.stream .value {
+            width: 4ch
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 99px;
+            background: #55634a
+        }
+
+        .dot.live {
+            background: var(--ok);
+            box-shadow: 0 0 10px rgba(34, 197, 94, .45)
+        }
+
+        .deck {
+            padding: 14px;
+            border-radius: 18px;
+            border: 1px solid var(--line);
+            background: radial-gradient(circle at top left, rgba(147, 197, 253, .08), transparent 35%), linear-gradient(180deg, #10161f, #0c1118)
+        }
+
+        .decktop,
+        .controls,
+        .footer,
+        .metarow {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap
+        }
+
+        .decktop {
+            align-items: center;
+            margin-bottom: 12px
+        }
+
+        .controls {
+            align-items: center
+        }
+
+        .metarow {
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 13px
+        }
+
+        .footer {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 13px
+        }
+
+        .decktitle {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: .04em
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 11px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(15, 23, 32, .9);
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 600
+        }
+
+        .audiomonitor {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 320px;
+            max-width: 460px;
+            width: 46%;
+            padding: 8px 12px;
+            border-radius: 16px;
+            border: 1px solid #314257;
+            background: linear-gradient(180deg, rgba(14, 21, 30, .98), rgba(10, 16, 24, .94));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+            overflow: hidden
+        }
+
+        .monitorcanvas {
+            display: block;
+            flex: 1 1 0;
+            min-width: 0;
+            width: auto;
+            height: 42px;
+            border-radius: 10px;
+            background: linear-gradient(180deg, rgba(7, 11, 18, .98), rgba(13, 20, 30, .94));
+            border: 1px solid rgba(49, 66, 87, .9)
+        }
+
+        .btn {
+            appearance: none;
+            border: 1px solid var(--line);
+            background: linear-gradient(180deg, #243244, #18222f);
+            color: var(--text);
+            border-radius: 12px;
+            padding: 10px 14px;
+            min-width: 86px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background .16s ease, border-color .16s ease, box-shadow .16s ease, color .16s ease
+        }
+
+        .btn.secondary {
+            min-width: 62px
+        }
+
+        .btn.is-live {
+            background: linear-gradient(180deg, #1f4f38, #163928);
+            border-color: #3d8b65;
+            box-shadow: 0 0 0 1px rgba(61, 139, 101, .25), 0 0 18px rgba(34, 197, 94, .12)
+        }
+
+        .btn.is-paused {
+            background: linear-gradient(180deg, #5b4620, #3f2f13);
+            border-color: #9a7a2a;
+            color: #fff0c2
+        }
+
+        .btn.is-muted {
+            background: linear-gradient(180deg, #4a2231, #321722);
+            border-color: #9d4b6b;
+            color: #ffd8e6
+        }
+
+        .btn:disabled {
+            opacity: .55;
+            cursor: not-allowed
+        }
+
+        .playbackbadge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            min-width: 170px;
+            border-radius: 12px;
+            border: 1px solid #263243;
+            background: rgba(16, 22, 30, .78);
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 700
+        }
+
+        .playdot {
+            width: 10px;
+            height: 10px;
+            border-radius: 99px;
+            background: #586576;
+            box-shadow: 0 0 0 1px rgba(255,255,255,.08)
+        }
+
+        .playbackbadge.is-live .playdot {
+            background: var(--ok);
+            box-shadow: 0 0 12px rgba(34, 197, 94, .45)
+        }
+
+        .playbackbadge.is-paused .playdot {
+            background: #f59e0b;
+            box-shadow: 0 0 12px rgba(245, 158, 11, .35)
+        }
+
+        .playbackbadge.is-muted .playdot {
+            background: #f472b6;
+            box-shadow: 0 0 12px rgba(244, 114, 182, .35)
+        }
+
+        .playbackbadge.is-offline .playdot {
+            background: #f87171;
+            box-shadow: 0 0 12px rgba(248, 113, 113, .32)
+        }
+
+        .vol {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 340px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid #263243;
+            background: rgba(16, 22, 30, .78)
+        }
+
+        .vol input {
+            width: 100%;
+            accent-color: #93c5fd
+        }
+
+        .timelinepanel {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 14px;
+            border: 1px solid #263243;
+            background: rgba(16, 22, 30, .78)
+        }
+
+        .timelinehead {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 10px
+        }
+
+        .timelinecopy {
+            color: var(--muted);
+            font-size: 13px
+        }
+
+        .timelinestatus {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 11px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(15, 23, 32, .9);
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 700
+        }
+
+        .timelinemap {
+            width: 100%;
+            height: 48px;
+            display: block;
+            border-radius: 10px;
+            border: 1px solid #314257;
+            background: linear-gradient(180deg, rgba(7, 11, 18, .98), rgba(13, 20, 30, .94))
+        }
+
+        .timelineslider {
+            width: 100%;
+            margin-top: 10px;
+            accent-color: #93c5fd
+        }
+
+        .timelinelegend {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 12px
+        }
+
+        .timelineinfo {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px
+        }
+
+        .timelinepill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 12px;
+            border: 1px solid #263243;
+            background: rgba(16, 22, 30, .78);
+            color: var(--text);
+            font-size: 13px
+        }
+
+        .timelinepill strong {
+            font-size: 14px
+        }
+
+        .hidden {
+            width: 0;
+            height: 0;
+            opacity: 0;
+            position: absolute;
+            pointer-events: none
+        }
+
+        a {
+            color: var(--accent)
+        }
+
+        @media (max-width:760px) {
+            .vol {
+                min-width: 0;
+                width: 100%
+            }
+
+            .controls {
+                align-items: stretch
+            }
+
+            .lcdmain {
+                font-size: clamp(20px, 5.8vw, 30px)
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="shell">
+        <div class="topnav">
+            <div class="navtitle">Scanner Pages</div>
+            <div class="navlinks">
+                <a class="pagelink active" href="/">Live</a>
+                <a class="pagelink" href="/recordings/">Recordings</a>
+            </div>
+        </div>
+        <div class="card">
+            <div class="label">Active Channel</div>
+            <div class="lcdshell" id="lcdShell">
+                <div class="lcdtop">
+                    <div class="lcdchips">
+                        <div class="lcdchip mode"><span class="tiny">Mode</span><span class="value" id="modeValue">---</span></div>
+                        <div class="lcdchip freq"><span class="tiny">Freq</span><span class="value" id="freqValue">---</span></div>
+                        <div class="lcdchip system"><span class="tiny">System</span><span class="value" id="statusValue">STOPPED</span></div>
+                        <div class="lcdchip record"><span class="tiny">Rec</span><span class="value" id="recordValue">OFF</span></div>
+                        <div class="lcdchip stream"><span class="dot" id="lcdDot"></span><span class="value" id="streamMini">Idle</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="lcdmain" id="channelDisplay">---</div>
+                <div class="lcdbottom">
+                    <div id="deviceValue">DEVICE ---</div>
+                    <div id="updatedValue">UPDATED --:--:--</div>
+                </div>
+            </div>
+            <div class="label">Live Audio</div>
+            <div class="deck">
+                <div class="decktop">
+                    <div class="decktitle">Scanner Audio Deck</div>
+                    <div class="audiomonitor">
+                        <canvas class="monitorcanvas" id="audioMonitor" width="360" height="42"></canvas>                    </div>
+                </div>
+                <div class="controls"><button class="btn" id="playButton" type="button">Play Audio</button><button
+                        class="btn secondary" id="muteButton" type="button">Mute</button><button class="btn"
+                        id="liveButton" type="button">Live</button>
+                    <div class="playbackbadge is-offline" id="playbackBadge"><span class="playdot"></span><span id="playbackState">Stopped</span></div>
+                    <div class="vol"><span>VOL</span><input id="volumeSlider" type="range" min="0" max="100"
+                            value="85"><span id="volumeValue">85%</span></div>
+                </div>
+                <div class="timelinepanel">
+                    <div class="timelinehead">
+                        <div>
+                            <div class="label" style="margin-bottom:4px">Rewind Timeline</div>
+                            <div class="timelinecopy" id="timelineCopy">Slide left to recent calls you may have missed, or tap Live to jump back.</div>
+                        </div>
+                        <div class="timelinestatus" id="timelineStatus">LIVE NOW</div>
+                    </div>
+                    <canvas class="timelinemap" id="timelineMap" width="860" height="48"></canvas>
+                    <input class="timelineslider" id="timelineSlider" type="range" min="0" max="0" step="1" value="0">
+                    <div class="timelinelegend"><span>Older</span><span>Live</span></div>
+                    <div class="timelineinfo">
+                        <div class="timelinepill"><span>Selected</span><strong id="timelineLabel">Live audio</strong></div>
+                        <div class="timelinepill"><span>When</span><strong id="timelineWhen">Now</strong></div>
+                    </div>
+                </div>
+                <div class="metarow">
+                    <div id="streamHint">Streaming disabled</div>
+                    <div><a id="rawLink" href="#" target="_blank" rel="noopener">Open raw stream page</a></div>
+                </div>
+                <audio id="scannerAudio" class="hidden" autoplay playsinline></audio>
+            </div>
+            <div class="footer">
+                <div>The custom player uses MediaMTX WebRTC under the hood.</div>
+                <div id="sessionState">Idle</div>
+            </div>
+        </div>
+    </div>
+        <script>
+        const audioEl = document.getElementById('scannerAudio'),
+            playButton = document.getElementById('playButton'),
+            muteButton = document.getElementById('muteButton'),
+            liveButton = document.getElementById('liveButton'),
+            volumeSlider = document.getElementById('volumeSlider'),
+            volumeValue = document.getElementById('volumeValue'),
+            audioMonitor = document.getElementById('audioMonitor'),
+            timelineMap = document.getElementById('timelineMap'),
+            timelineSlider = document.getElementById('timelineSlider'),
+            timelineCopy = document.getElementById('timelineCopy'),
+            timelineStatus = document.getElementById('timelineStatus'),
+            timelineLabel = document.getElementById('timelineLabel'),
+            timelineWhen = document.getElementById('timelineWhen'),
+            sessionState = document.getElementById('sessionState'),
+            playbackBadge = document.getElementById('playbackBadge'),
+            playbackState = document.getElementById('playbackState');
+        let latestStatus = null,
+            recentCalls = [],
+            selectedCall = null,
+            previewCall = null,
+            mode = 'live',
+            peerConnection = null,
+            playerStarting = false,
+            lastStreamUrl = '',
+            userPaused = false,
+            audioContext = null,
+            monitorSourceNode = null,
+            analyserNode = null,
+            audioDataArray = null,
+            monitorFrame = 0;
+
+        function setPlayerStatus() {
+            return
+        }
+
+        function drawMonitorIdle() {
+            const ctx = audioMonitor.getContext('2d');
+            const width = audioMonitor.width;
+            const height = audioMonitor.height;
+            ctx.clearRect(0, 0, width, height);
+            const gradient = ctx.createLinearGradient(0, 0, width, 0);
+            gradient.addColorStop(0, 'rgba(34, 197, 94, 0.08)');
+            gradient.addColorStop(1, 'rgba(147, 197, 253, 0.02)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+            ctx.strokeStyle = 'rgba(71, 85, 105, 0.35)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, height / 2);
+            ctx.lineTo(width, height / 2);
+            ctx.stroke()
+        }
+
+        function ensureAudioMonitor() {
+            if (!(window.AudioContext || window.webkitAudioContext)) return false;
+            if (!audioContext) {
+                const Context = window.AudioContext || window.webkitAudioContext;
+                audioContext = new Context();
+                analyserNode = audioContext.createAnalyser();
+                analyserNode.fftSize = 256;
+                analyserNode.smoothingTimeConstant = 0.78;
+                audioDataArray = new Uint8Array(analyserNode.frequencyBinCount)
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().catch(() => {})
+            }
+            return true
+        }
+
+        function connectAudioMonitorStream(stream) {
+            if (!stream || !ensureAudioMonitor()) return;
+            if (monitorSourceNode) {
+                try { monitorSourceNode.disconnect() } catch (err) {}
+                monitorSourceNode = null
+            }
+            monitorSourceNode = audioContext.createMediaStreamSource(stream);
+            monitorSourceNode.connect(analyserNode)
+        }
+
+        function renderAudioMonitor() {
+            if (!analyserNode || !audioDataArray || !monitorSourceNode) {
+                drawMonitorIdle();
+                monitorFrame = 0;
+                return
+            }
+            const ctx = audioMonitor.getContext('2d');
+            const width = audioMonitor.width;
+            const height = audioMonitor.height;
+            analyserNode.getByteFrequencyData(audioDataArray);
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = 'rgba(8, 13, 20, 0.92)';
+            ctx.fillRect(0, 0, width, height);
+            const barCount = 48;
+            const gap = 2;
+            const barWidth = (width - (barCount - 1) * gap) / barCount;
+            for (let i = 0; i < barCount; i += 1) {
+                const index = Math.min(audioDataArray.length - 1, Math.floor(i * audioDataArray.length / barCount));
+                const magnitude = audioDataArray[index] / 255;
+                const barHeight = Math.max(3, magnitude * (height - 6));
+                const x = i * (barWidth + gap);
+                const y = height - barHeight - 3;
+                const gradient = ctx.createLinearGradient(0, y, 0, height);
+                gradient.addColorStop(0, magnitude > 0.72 ? '#f59e0b' : '#9fe870');
+                gradient.addColorStop(1, '#22c55e');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(x, y, barWidth, barHeight)
+            }
+            monitorFrame = window.requestAnimationFrame(renderAudioMonitor)
+        }
+
+        function startAudioMonitor() {
+            if (!ensureAudioMonitor()) return;
+            const activeStream = audioEl.srcObject;
+            if (activeStream && !monitorSourceNode) connectAudioMonitorStream(activeStream);
+            if (!monitorFrame) renderAudioMonitor()
+        }
+
+        function stopAudioMonitor() {
+            if (monitorFrame) {
+                window.cancelAnimationFrame(monitorFrame);
+                monitorFrame = 0
+            }
+            if (monitorSourceNode) {
+                try { monitorSourceNode.disconnect() } catch (err) {}
+                monitorSourceNode = null
+            }
+            drawMonitorIdle()
+        }
+
+        function setSessionState(text) { sessionState.textContent = text }
+
+        function setPlaybackState(text, stateClass) {
+            playbackState.textContent = text;
+            playbackBadge.classList.remove('is-live', 'is-paused', 'is-muted', 'is-offline');
+            if (stateClass) playbackBadge.classList.add(stateClass)
+        }
+
+        function formatCallLabel(item) {
+            if (!item) return 'Live audio';
+            return [item.frequency || '', item.label || 'Unknown Channel'].join(' ').trim()
+        }
+
+        function formatCallWhen(item) {
+            if (!item) return 'Now';
+            return item.started_at_label || item.started_at || 'Recent'
+        }
+
+        function sliderValueForCall(item) {
+            if (!item || !recentCalls.length) return recentCalls.length;
+            const index = recentCalls.findIndex((entry) => entry.id === item.id);
+            if (index < 0) return recentCalls.length;
+            return recentCalls.length - 1 - index
+        }
+
+        function callForSliderValue(value) {
+            if (!recentCalls.length) return null;
+            if (value >= recentCalls.length) return null;
+            return recentCalls[recentCalls.length - 1 - value] || null
+        }
+
+        function drawTimelineMap() {
+            const ctx = timelineMap.getContext('2d');
+            const width = timelineMap.width;
+            const height = timelineMap.height;
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = 'rgba(8, 13, 20, 0.92)';
+            ctx.fillRect(0, 0, width, height);
+            ctx.strokeStyle = 'rgba(71, 85, 105, 0.55)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(12, height / 2);
+            ctx.lineTo(width - 12, height / 2);
+            ctx.stroke();
+            if (!recentCalls.length) return;
+            const maxValue = recentCalls.length;
+            recentCalls.forEach((item, index) => {
+                const sliderValue = recentCalls.length - 1 - index;
+                const ratio = maxValue === 0 ? 1 : sliderValue / maxValue;
+                const x = 12 + ratio * (width - 24);
+                const isSelected = selectedCall && item.id === selectedCall.id;
+                const isPreview = previewCall && item.id === previewCall.id;
+                const barHeight = Math.max(10, Math.min(26, 8 + Math.round((Number(item.duration_seconds) || 0) * 2)));
+                ctx.fillStyle = isSelected ? '#93c5fd' : isPreview ? '#f59e0b' : '#22c55e';
+                ctx.fillRect(x - 3, (height - barHeight) / 2, 6, barHeight);
+            });
+            ctx.fillStyle = '#d7e2af';
+            ctx.beginPath();
+            ctx.arc(width - 12, height / 2, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function updateTimelineUi() {
+            const activeItem = previewCall || selectedCall;
+            timelineSlider.max = String(Math.max(0, recentCalls.length));
+            timelineSlider.value = String(mode === 'live' ? recentCalls.length : sliderValueForCall(activeItem));
+            timelineStatus.textContent = mode === 'live' ? 'LIVE NOW' : 'REPLAY';
+            timelineLabel.textContent = mode === 'live' ? 'Live audio' : formatCallLabel(activeItem);
+            timelineWhen.textContent = mode === 'live' ? 'Now' : formatCallWhen(activeItem);
+            timelineCopy.textContent = recentCalls.length ? 'Drag left to recent calls you may have missed, then release to hear one. Press Live to jump back.' : 'Waiting for completed calls to appear in the rewind timeline.';
+            liveButton.classList.toggle('is-live', mode === 'live');
+            drawTimelineMap()
+        }
+
+        function updateButtons() {
+            const isPlaying = !audioEl.paused && !audioEl.ended;
+            playButton.textContent = playerStarting ? 'Connecting...' : isPlaying ? 'Pause Audio' : 'Play Audio';
+            muteButton.textContent = audioEl.muted ? 'Unmute' : 'Mute';
+            playButton.classList.toggle('is-live', isPlaying);
+            playButton.classList.toggle('is-paused', !playerStarting && !isPlaying);
+            muteButton.classList.toggle('is-muted', audioEl.muted);
+            if (playerStarting) {
+                setPlaybackState('Connecting', 'is-paused');
+            } else if (audioEl.muted && isPlaying) {
+                setPlaybackState(mode === 'live' ? 'Muted Live' : 'Muted Replay', 'is-muted');
+            } else if (isPlaying) {
+                setPlaybackState(mode === 'live' ? 'Playing Live' : 'Playing Replay', 'is-live');
+            } else if (userPaused) {
+                setPlaybackState('Paused', 'is-paused');
+            } else {
+                setPlaybackState(mode === 'live' ? 'Standby Live' : 'Replay Ready', 'is-offline');
+            }
+            updateTimelineUi()
+        }
+
+        function setVolume(value) {
+            const n = Math.max(0, Math.min(100, value));
+            audioEl.volume = n / 100;
+            volumeSlider.value = n;
+            volumeValue.textContent = n + '%'
+        }
+
+        function closePeer() {
+            if (peerConnection) {
+                try { peerConnection.ontrack = null } catch (err) {}
+                try { peerConnection.close() } catch (err) {}
+                peerConnection = null
+            }
+        }
+
+        function closePlayer() {
+            closePeer();
+            audioEl.pause();
+            audioEl.removeAttribute('src');
+            audioEl.srcObject = null;
+            playerStarting = false;
+            stopAudioMonitor();
+            updateButtons()
+        }
+
+        function waitForIceComplete(pc, timeoutMs) {
+            return new Promise((resolve) => {
+                if (pc.iceGatheringState === 'complete') {
+                    resolve();
+                    return
+                }
+                const timeout = setTimeout(done, timeoutMs);
+                function onChange() {
+                    if (pc.iceGatheringState === 'complete') done()
+                }
+                function done() {
+                    clearTimeout(timeout);
+                    pc.removeEventListener('icegatheringstatechange', onChange);
+                    resolve()
+                }
+                pc.addEventListener('icegatheringstatechange', onChange)
+            })
+        }
+
+        async function startPlayer(autoStart) {
+            if (playerStarting) return;
+            if (!latestStatus || !latestStatus.streaming_enabled || !latestStatus.raw_stream_url) {
+                setSessionState('No stream available');
+                setPlaybackState('Stream Off', 'is-offline');
+                return
+            }
+            closePlayer();
+            mode = 'live';
+            previewCall = null;
+            selectedCall = null;
+            playerStarting = true;
+            playButton.disabled = true;
+            updateButtons();
+            setSessionState('Negotiating WebRTC session');
+            try {
+                const pc = new RTCPeerConnection({ iceServers: [] });
+                peerConnection = pc;
+                pc.addTransceiver('audio', { direction: 'recvonly' });
+                pc.ontrack = async (event) => {
+                    const stream = event.streams[0];
+                    if (stream) {
+                        audioEl.srcObject = stream;
+                        connectAudioMonitorStream(stream);
+                        if (!userPaused || autoStart) {
+                            try {
+                                await audioEl.play();
+                                startAudioMonitor()
+                            } catch (err) {
+                                setSessionState('Press Play Audio to start sound');
+                                setPlaybackState('Awaiting Click', 'is-paused')
+                            }
+                        }
+                        updateButtons()
+                    }
+                };
+                pc.onconnectionstatechange = () => {
+                    const state = pc.connectionState;
+                    if (state === 'connected') {
+                        setSessionState('Live audio connected');
+                    } else if (state === 'connecting') {
+                        setSessionState('Establishing peer connection');
+                    } else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+                        setSessionState('Reconnect by pressing Play Audio');
+                        setPlaybackState('Connection Lost', 'is-offline')
+                    }
+                };
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                await waitForIceComplete(pc, 1500);
+                const res = await fetch('/api/whep', { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp, cache: 'no-store' });
+                if (!res.ok) throw new Error('WHEP request failed with status ' + res.status);
+                const answer = await res.text();
+                await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+                setSessionState('Waiting for first audio packets');
+                setPlaybackState('Buffering', 'is-paused')
+            } catch (err) {
+                closePlayer();
+                setSessionState(err && err.message ? err.message : 'Failed to start player');
+                setPlaybackState('Unavailable', 'is-offline')
+            } finally {
+                playerStarting = false;
+                playButton.disabled = false;
+                updateButtons()
+            }
+        }
+
+        async function playReplay(item, autoplay) {
+            if (!item || !item.file_exists || !item.playable_url) {
+                setSessionState('That recent call is no longer available');
+                return
+            }
+            closePeer();
+            mode = 'replay';
+            selectedCall = item;
+            previewCall = null;
+            audioEl.pause();
+            audioEl.srcObject = null;
+            audioEl.src = item.playable_url;
+            audioEl.load();
+            stopAudioMonitor();
+            setSessionState('Replaying ' + formatCallLabel(item));
+            if (autoplay) {
+                try {
+                    await audioEl.play()
+                } catch (err) {
+                    setSessionState('Press Play Audio to hear the selected call')
+                }
+            }
+            updateButtons()
+        }
+
+        async function returnToLive(autoplay) {
+            userPaused = false;
+            await startPlayer(autoplay)
+        }
+
+        async function refreshRecentCalls() {
+            try {
+                const res = await fetch('/api/radio-calls?limit=40', { cache: 'no-store' });
+                if (!res.ok) throw new Error('radio calls failed');
+                const data = await res.json();
+                recentCalls = Array.isArray(data.items) ? data.items : [];
+                if (selectedCall) {
+                    const match = recentCalls.find((item) => item.id === selectedCall.id);
+                    if (!match && mode === 'replay') {
+                        mode = 'live';
+                        selectedCall = null;
+                    } else {
+                        selectedCall = match || selectedCall;
+                    }
+                }
+                updateTimelineUi()
+            } catch (err) {
+                recentCalls = [];
+                updateTimelineUi()
+            }
+        }
+
+        async function refresh() {
+            try {
+                const res = await fetch('/api/status', { cache: 'no-store' });
+                const data = await res.json();
+                latestStatus = data;
+                const streamState = (data.stream_status || 'OFF').toUpperCase(),
+                    recording = !!data.recording,
+                    statusText = (data.status || 'STOPPED').toUpperCase();
+                document.getElementById('statusValue').textContent = statusText;
+                document.getElementById('recordValue').textContent = recording ? 'ON' : 'OFF';
+                document.getElementById('channelDisplay').textContent = data.display || '---';
+                document.getElementById('lcdShell').classList.toggle('recording', recording);
+                document.getElementById('freqValue').textContent = data.frequency || '---';
+                document.getElementById('modeValue').textContent = data.mode || '---';
+                document.getElementById('streamMini').textContent = streamState;
+                document.getElementById('deviceValue').textContent = 'DEVICE ' + (data.audio_device || '---');
+                document.getElementById('updatedValue').textContent = 'UPDATED ' + (data.updated_at || '---');
+                document.getElementById('lcdDot').classList.toggle('live', streamState === 'LIVE' || streamState === 'READY');
+                const rawUrl = data.raw_stream_url || '';
+                document.getElementById('rawLink').href = rawUrl ? rawUrl + '/' : '#';
+                document.getElementById('streamHint').textContent = data.streaming_enabled ? ('Stream source: ' + rawUrl) : 'Streaming disabled';
+                const ready = data.streaming_enabled && rawUrl && ['LIVE', 'READY'].includes(streamState);
+                if (mode === 'live') {
+                    if (!ready) {
+                        closePlayer();
+                        setSessionState(data.streaming_enabled ? 'No active WebRTC session' : 'Enable streaming in the app');
+                        lastStreamUrl = rawUrl
+                    } else if ((!peerConnection || peerConnection.connectionState === 'closed' || peerConnection.connectionState === 'failed') && !playerStarting) {
+                        lastStreamUrl = rawUrl;
+                        startPlayer(true)
+                    } else if (rawUrl !== lastStreamUrl && !playerStarting) {
+                        lastStreamUrl = rawUrl;
+                        startPlayer(true)
+                    }
+                }
+            } catch (err) {
+                setSessionState('Metadata request failed');
+                setPlaybackState('Status Error', 'is-offline')
+            }
+        }
+
+        playButton.addEventListener('click', async () => {
+            if (mode === 'live') {
+                if (!peerConnection || peerConnection.connectionState === 'closed' || peerConnection.connectionState === 'failed') {
+                    userPaused = false;
+                    await startPlayer(false);
+                    return
+                }
+                if (audioEl.paused) {
+                    userPaused = false;
+                    try {
+                        await audioEl.play();
+                        setSessionState('Audio resumed')
+                    } catch (err) {
+                        setSessionState('Browser blocked autoplay, press Play Audio again')
+                    }
+                } else {
+                    userPaused = true;
+                    audioEl.pause();
+                    setSessionState('Audio paused locally')
+                }
+            } else if (selectedCall) {
+                if (audioEl.paused) {
+                    userPaused = false;
+                    try {
+                        await audioEl.play();
+                        setSessionState('Replay resumed')
+                    } catch (err) {
+                        setSessionState('Press Play Audio again to hear the selected call')
+                    }
+                } else {
+                    userPaused = true;
+                    audioEl.pause();
+                    setSessionState('Replay paused')
+                }
+            }
+            updateButtons()
+        });
+
+        muteButton.addEventListener('click', () => {
+            audioEl.muted = !audioEl.muted;
+            updateButtons()
+        });
+
+        liveButton.addEventListener('click', async () => {
+            await returnToLive(true)
+        });
+
+        timelineSlider.addEventListener('input', () => {
+            const value = Number(timelineSlider.value);
+            previewCall = callForSliderValue(value);
+            timelineStatus.textContent = previewCall ? 'READY TO REPLAY' : 'LIVE NOW';
+            timelineLabel.textContent = previewCall ? formatCallLabel(previewCall) : 'Live audio';
+            timelineWhen.textContent = previewCall ? formatCallWhen(previewCall) : 'Now';
+            drawTimelineMap()
+        });
+
+        timelineSlider.addEventListener('change', async () => {
+            const value = Number(timelineSlider.value);
+            const item = callForSliderValue(value);
+            if (!item) {
+                previewCall = null;
+                await returnToLive(true);
+                return
+            }
+            await playReplay(item, true)
+        });
+
+        volumeSlider.addEventListener('input', (event) => setVolume(Number(event.target.value)));
+        audioEl.addEventListener('play', () => {
+            if (mode === 'live') startAudioMonitor();
+            updateButtons()
+        });
+        audioEl.addEventListener('pause', () => {
+            if (mode === 'live') stopAudioMonitor();
+            updateButtons()
+        });
+        audioEl.addEventListener('ended', () => {
+            if (mode === 'replay') setSessionState('Replay ended. Drag the line again or press Live.');
+            updateButtons()
+        });
+
+        drawMonitorIdle();
+        setVolume(85);
+        setPlaybackState('Stopped', 'is-offline');
+        updateButtons();
+        refresh();
+        refreshRecentCalls();
+        setInterval(refresh, 500);
+        setInterval(refreshRecentCalls, 3000);
+    </script>
+</body>
+
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

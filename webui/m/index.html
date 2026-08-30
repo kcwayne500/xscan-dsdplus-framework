@@ -1,0 +1,506 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#08111a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Scanner Mobile">
+    <link rel="manifest" href="/m/manifest.webmanifest">
+    <title>Scanner Mobile</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #08111a;
+            --bg2: #0f1c29;
+            --panel: rgba(12, 21, 31, 0.9);
+            --panel-strong: rgba(7, 14, 22, 0.96);
+            --line: rgba(124, 148, 173, 0.18);
+            --text: #eef5fb;
+            --muted: #9db0c3;
+            --accent-strong: #0ea5e9;
+            --live: #22c55e;
+            --warn: #f59e0b;
+            --bad: #fb7185;
+            --replay: #93c5fd;
+            --lcd: #d4dea4;
+            --lcdb: #9aa56d;
+            --lcdfg: #24311e;
+            --shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
+            --radius-panel: 22px;
+            --radius-card: 18px;
+            --radius-control: 14px;
+            --radius-chip: 12px;
+            --safe-bottom: max(18px, env(safe-area-inset-bottom));
+            --safe-top: max(14px, env(safe-area-inset-top));
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            background: radial-gradient(circle at top, rgba(14, 165, 233, 0.18), transparent 34%), linear-gradient(180deg, var(--bg2), var(--bg));
+            color: var(--text);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        body { overflow-x: hidden; }
+        button, input { font: inherit; }
+        .app { min-height: 100vh; display: flex; flex-direction: column; width: min(100%, 520px); padding: var(--safe-top) 12px calc(120px + var(--safe-bottom)); margin: 0 auto; }
+        .eyebrow, .mini-label { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+        .hero {
+            position: relative; padding: 14px; border-radius: var(--radius-panel); border: 1px solid var(--line);
+            background: radial-gradient(circle at top right, rgba(34, 197, 94, 0.16), transparent 34%), linear-gradient(180deg, rgba(13, 24, 36, 0.96), rgba(6, 13, 20, 0.96));
+            box-shadow: var(--shadow); overflow: hidden;
+        }
+        .hero::after {
+            content: ""; position: absolute; inset: auto -20% -45% auto; width: 220px; height: 220px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(125, 211, 252, 0.18), transparent 70%); pointer-events: none;
+        }
+        .hero-top { display: flex; justify-content: flex-end; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+        .hero-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; min-width: 0; }
+        .badge {
+            display: inline-flex; align-items: center; gap: 6px; min-height: 28px; max-width: 88px; padding: 0 9px; border-radius: 14px;
+            border: 1px solid var(--line); background: rgba(255, 255, 255, 0.035); color: var(--text); font-size: 11px; font-weight: 700; line-height: 1;
+            overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+        }
+        .badge-dot { width: 10px; height: 10px; border-radius: 50%; background: #526274; }
+        .badge.is-live .badge-dot { background: var(--live); box-shadow: 0 0 14px rgba(34, 197, 94, 0.5); }
+        .badge.is-replay .badge-dot { background: var(--replay); box-shadow: 0 0 14px rgba(147, 197, 253, 0.42); }
+        .badge.is-paused .badge-dot { background: var(--warn); box-shadow: 0 0 14px rgba(245, 158, 11, 0.42); }
+        .badge.is-offline .badge-dot { background: var(--bad); box-shadow: 0 0 14px rgba(251, 113, 133, 0.32); }
+        .icon-btn, .ghost-btn, .fab, .sheet-action, .call-row { appearance: none; border: 0; color: inherit; }
+        .icon-btn, .ghost-btn, .sheet-action { border-radius: var(--radius-control); border: 1px solid var(--line); background: rgba(255, 255, 255, 0.035); cursor: pointer; }
+        .icon-btn { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; flex: 0 0 auto; }
+        .hero-body { display: grid; gap: 10px; min-width: 0; }
+        .lcdshell {
+            background: linear-gradient(180deg, #dfe8bb, var(--lcd));
+            color: var(--lcdfg);
+            border: 2px solid var(--lcdb);
+            border-radius: 18px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -10px 30px rgba(154, 165, 109, 0.15);
+            padding: 10px 12px 11px;
+            display: grid;
+            grid-template-rows: auto 92px 42px;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .lcdtop, .lcdbottom {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0;
+            font-family: Consolas, "Lucida Console", monospace;
+            text-transform: uppercase;
+        }
+        .lcdtop { margin-bottom: 8px; }
+        .lcdbottom { margin-top: 8px; font-size: 10px; letter-spacing: 0.05em; opacity: 0.9; }
+        .lcdbottom > div { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lcdchips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; width: 100%; min-width: 0; }
+        .lcdchip {
+            display: inline-flex; align-items: center; gap: 6px; min-width: 0; width: 100%;
+            padding: 3px 8px; border-radius: 10px; border: 1px solid rgba(108, 118, 74, 0.42);
+            background: rgba(247, 250, 226, 0.28); font-family: Consolas, monospace;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1;
+        }
+        .lcdchip .tiny { font-size: 9px; opacity: 0.68; flex: 0 0 auto; }
+        .lcdchip .value { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .lcdchip.mode .value { max-width: 7ch; }
+        .lcdchip.freq .value { max-width: 8ch; }
+        .lcdchip.system .value { max-width: 7ch; }
+        .lcdchip.stream .value { max-width: 4ch; }
+        .lcdchip .dot { width: 8px; height: 8px; border-radius: 99px; background: #55634a; flex: 0 0 auto; }
+        .lcdchip.stream.live .dot { background: var(--live); box-shadow: 0 0 10px rgba(34, 197, 94, 0.45); }
+        .lcdchip.stream.replay .dot { background: var(--replay); box-shadow: 0 0 10px rgba(147, 197, 253, 0.38); }
+        .lcdchip.stream.paused .dot { background: var(--warn); box-shadow: 0 0 10px rgba(245, 158, 11, 0.38); }
+        .lcdchip.stream.offline .dot { background: var(--bad); box-shadow: 0 0 10px rgba(251, 113, 133, 0.32); }
+        .channel { display: grid; gap: 6px; grid-template-rows: 48px 16px 16px; min-height: 0; min-width: 0; }
+        .channel-name {
+            font-family: Consolas, monospace; font-size: clamp(18px, 5.8vw, 26px); line-height: 0.95;
+            letter-spacing: 0.03em; text-transform: uppercase; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box;
+            -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; min-height: 1.9em; max-height: 1.9em;
+            width: 100%;
+        }
+        .now-playing { font-size: 13px; line-height: 16px; height: 16px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+        .subline { color: var(--muted); font-size: 12px; line-height: 16px; height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+        .lcdshell .now-playing { color: rgba(36, 49, 30, 0.9); font-weight: 600; }
+        .lcdshell .subline { color: rgba(36, 49, 30, 0.78); }
+        .pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .pill { display: inline-flex; align-items: center; min-height: 30px; min-width: 0; max-width: 100%; padding: 0 10px; border-radius: var(--radius-chip); border: 1px solid var(--line); background: rgba(255, 255, 255, 0.035); font-size: 12px; color: var(--muted); overflow: hidden; }
+        .pill strong { color: var(--text); margin-left: 6px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 17ch; display: inline-block; }
+        .hero-meta { display: grid; gap: 6px; min-width: 0; }
+        .control-stack { margin-top: 10px; display: grid; gap: 12px; }
+        .transport {
+            display: grid; grid-template-columns: 46px minmax(0, 1fr) 72px 46px; gap: 8px; align-items: stretch;
+        }
+        .transport-btn {
+            min-height: 42px; min-width: 0; border-radius: var(--radius-control); border: 1px solid var(--line); background: rgba(255, 255, 255, 0.035);
+            color: var(--text); cursor: pointer; font-weight: 700; font-size: 12px;
+        }
+        .transport-btn.nav-btn {
+            background: linear-gradient(180deg, rgba(36, 51, 70, 0.74), rgba(20, 30, 42, 0.92));
+            border-color: rgba(125, 148, 173, 0.28);
+            color: #dbe7f3;
+            font-size: 15px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+        .transport-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .transport-btn.live-btn.is-active {
+            background: linear-gradient(180deg, rgba(52, 211, 153, 0.24), rgba(34, 197, 94, 0.16));
+            border-color: rgba(74, 222, 128, 0.35);
+            color: #d7ffe6;
+        }
+        .fab {
+            min-height: 42px; min-width: 0; width: 100%; padding: 0 12px; border-radius: var(--radius-control); display: inline-flex; justify-content: center; align-items: center; gap: 8px;
+            cursor: pointer; color: #02131c; background: linear-gradient(180deg, #8fdcff, #48bdf0);
+            box-shadow: 0 6px 14px rgba(14, 165, 233, 0.14); border: 0;
+        }
+        .fab-label { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+        .fab-glyph { font-size: 16px; line-height: 1; margin-left: 0; }
+        .fab.is-paused { background: radial-gradient(circle at top, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, #f7ca71, #f59e0b); box-shadow: 0 8px 16px rgba(245, 158, 11, 0.16); }
+        .fab.is-offline { background: radial-gradient(circle at top, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, #fda4af, #fb7185); box-shadow: 0 8px 16px rgba(251, 113, 133, 0.14); }
+        .slider-card { padding: 14px; border-radius: var(--radius-card); border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); min-width: 0; overflow: hidden; }
+        .slider-top, .slider-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+        .slider-top { margin-bottom: 12px; }
+        .slider-top > div:first-child { min-width: 0; flex: 1 1 auto; }
+        .slider-title { font-size: 14px; font-weight: 700; }
+        .slider-caption { color: var(--muted); font-size: 12px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .slider-value { text-align: right; font-size: 13px; font-weight: 700; color: var(--text); flex: 0 0 auto; }
+        .slider-badge {
+            flex: 0 0 auto; min-width: 68px; max-width: 88px; text-align: center; border-radius: var(--radius-chip); padding: 6px 10px;
+            border: 1px solid var(--line); background: rgba(255, 255, 255, 0.035); color: var(--text); font-size: 12px; font-weight: 700;
+        }
+        .timeline-shell { display: grid; gap: 10px; }
+        .timeline-notches {
+            height: 36px; padding: 8px 10px; border-radius: 12px; border: 1px solid rgba(74, 222, 128, 0.12);
+            background: linear-gradient(180deg, rgba(8, 27, 20, 0.9), rgba(9, 23, 24, 0.72));
+            display: flex; align-items: flex-end; gap: 5px; overflow: hidden;
+        }
+        .timeline-notch {
+            width: 4px; border-radius: 999px; background: rgba(74, 222, 128, 0.9); box-shadow: 0 0 10px rgba(74, 222, 128, 0.28);
+            opacity: 0.92; flex: 0 0 auto;
+        }
+        .timeline-notch.is-current { background: #f4f7d1; box-shadow: 0 0 10px rgba(244, 247, 209, 0.3); }
+        .timeline-notch.is-dim { opacity: 0.28; }
+        .timeline { width: 100%; accent-color: var(--accent-strong); }
+        .quick-actions {
+            position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); width: min(520px, 100%);
+            padding: 12px 16px calc(16px + var(--safe-bottom)); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;
+            background: linear-gradient(180deg, rgba(8, 17, 26, 0), rgba(8, 17, 26, 0.84) 20%, rgba(8, 17, 26, 0.98) 55%); backdrop-filter: blur(18px);
+        }
+        .ghost-btn { min-height: 50px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; gap: 2px; color: var(--text); cursor: pointer; min-width: 0; }
+        .ghost-btn strong { font-size: 13px; font-weight: 700; }
+        .ghost-btn span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sheet-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.46); opacity: 0; pointer-events: none; transition: opacity 180ms ease; }
+        .sheet-backdrop.is-open { opacity: 1; pointer-events: auto; }
+        .sheet {
+            position: fixed; inset: auto 0 0; z-index: 20; max-width: 520px; margin: 0 auto; left: 50%; width: min(520px, 100%);
+            transform: translate(-50%, calc(100% + 24px)); transition: transform 220ms ease; padding: 10px 14px calc(18px + var(--safe-bottom)); pointer-events: none;
+        }
+        .sheet.is-open { transform: translate(-50%, 0); pointer-events: auto; }
+        .sheet-shell { border-radius: 22px 22px 0 0; border: 1px solid var(--line); background: var(--panel-strong); box-shadow: 0 -20px 36px rgba(0, 0, 0, 0.32); overflow: hidden; }
+        .sheet-grab { width: 56px; height: 5px; border-radius: 999px; background: rgba(157, 176, 195, 0.35); margin: 12px auto 4px; }
+        .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px 8px; }
+        .sheet-title { font-size: 16px; font-weight: 700; }
+        .sheet-content { max-height: min(72vh, 620px); overflow-y: auto; padding: 8px 16px 16px; display: grid; gap: 12px; }
+        .sheet-card { border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); padding: 14px; }
+        .kv { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 10px; align-items: start; font-size: 14px; line-height: 1.4; }
+        .kv + .kv { margin-top: 10px; }
+        .kv-key { color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; padding-top: 3px; }
+        .kv-value { color: var(--text); word-break: break-word; }
+        .call-list { display: grid; gap: 10px; }
+        .call-row { width: 100%; text-align: left; padding: 14px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03); cursor: pointer; display: grid; gap: 6px; }
+        .call-row.is-active { border-color: rgba(125, 211, 252, 0.55); background: rgba(125, 211, 252, 0.09); }
+        .call-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; font-weight: 700; }
+        .call-meta { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); font-size: 12px; }
+        .sheet-action { min-height: 48px; width: 100%; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; color: var(--text); text-decoration: none; }
+        .sheet-action strong { font-size: 14px; }
+        .sheet-action span { color: var(--muted); font-size: 13px; }
+        .range-row { display: grid; gap: 8px; }
+        .range-row input { width: 100%; accent-color: var(--accent-strong); }
+        .empty { color: var(--muted); font-size: 14px; line-height: 1.45; }
+        @media (max-width: 420px) {
+            .hero { padding: 12px; }
+            .hero-top { margin-bottom: 8px; }
+            .hero-actions { gap: 6px; }
+            .badge { max-width: 80px; padding: 0 8px; }
+            .lcdtop, .lcdbottom { gap: 6px; }
+            .lcdshell { grid-template-rows: auto 88px 38px; }
+            .lcdbottom { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+            .lcdchip { padding: 3px 6px; }
+            .channel { grid-template-rows: 46px 16px 16px; }
+            .channel-name { font-size: clamp(17px, 5.5vw, 24px); }
+            .transport { grid-template-columns: 40px minmax(0, 1fr) 56px 40px; gap: 6px; }
+            .transport-btn, .fab { min-height: 40px; }
+            .transport-btn.nav-btn { font-size: 14px; }
+            .fab-label { font-size: 11px; letter-spacing: 0.06em; }
+            .slider-top { flex-wrap: wrap; align-items: flex-start; }
+            .slider-badge { min-width: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <section class="hero">
+            <div class="hero-top">
+                <div class="hero-actions">
+                    <div class="badge is-offline" id="playbackBadge"><span class="badge-dot"></span><span id="playbackState">Stopped</span></div>
+                    <button class="icon-btn" id="installButton" type="button" hidden aria-label="Install app">+</button>
+                </div>
+            </div>
+            <div class="hero-body">
+                <div class="lcdshell">
+                    <div class="lcdtop">
+                        <div class="lcdchips">
+                            <div class="lcdchip mode"><span class="tiny">Mode</span><span class="value" id="modeValue">---</span></div>
+                            <div class="lcdchip freq"><span class="tiny">Freq</span><span class="value" id="freqValue">---</span></div>
+                            <div class="lcdchip system"><span class="tiny">View</span><span class="value" id="viewValue">Live</span></div>
+                            <div class="lcdchip stream offline" id="streamChip"><span class="dot"></span><span class="value" id="streamMini">Idle</span></div>
+                        </div>
+                    </div>
+                    <div class="channel">
+                        <div class="channel-name" id="channelDisplay">---</div>
+                        <div class="hero-meta">
+                            <div class="now-playing" id="nowPlayingText">Live stream idle</div>
+                            <div class="subline" id="sessionState">Waiting for stream metadata</div>
+                        </div>
+                    </div>
+                    <div class="lcdbottom">
+                        <div id="deviceValue">Device ---</div>
+                        <div id="updatedValue">Updated --</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="control-stack">
+            <div class="transport">
+                <button class="transport-btn nav-btn" id="prevButton" type="button" aria-label="Previous call">«</button>
+                <button class="fab is-offline" id="playButton" type="button"><span class="fab-glyph" id="playGlyph">▶</span><span class="fab-label" id="playLabel">Play</span></button>
+                <button class="transport-btn live-btn" id="liveButton" type="button">Live</button>
+                <button class="transport-btn nav-btn" id="nextButton" type="button" aria-label="Next call">»</button>
+            </div>
+            <div class="slider-card">
+                <div class="slider-top"><div><div class="slider-title">Rewind Timeline</div><div class="slider-caption" id="sliderCaption">Live mode. Press previous to load the newest recent transmission.</div></div><div class="slider-badge" id="sliderValueLabel">Live Now</div></div>
+                <div class="timeline-shell">
+                    <div class="timeline-notches" id="timelineNotches" aria-hidden="true"></div>
+                    <input class="timeline" id="historySlider" type="range" min="0" max="0" step="1" value="0" disabled>
+                </div>
+                <div class="slider-bottom"><span class="slider-caption">Older</span><span class="slider-caption">Live</span></div>
+            </div>
+        </section>
+    </div>
+    <div class="quick-actions">
+        <button class="ghost-btn" id="openCalls" type="button"><strong>Calls</strong><span id="callsSummary">Recent history</span></button>
+        <button class="ghost-btn" id="openDetails" type="button"><strong>Details</strong><span id="detailsSummary">Stream info</span></button>
+        <button class="ghost-btn" id="openSettings" type="button"><strong>More</strong><span id="settingsSummary">Volume and install</span></button>
+    </div>
+    <div class="sheet-backdrop" id="sheetBackdrop"></div>
+    <section class="sheet" id="callsSheet" aria-hidden="true"><div class="sheet-shell"><div class="sheet-grab"></div><div class="sheet-head"><div><div class="mini-label">Recent Calls</div><div class="sheet-title">Replay History</div></div><button class="icon-btn" data-close-sheet="callsSheet" type="button" aria-label="Close calls">×</button></div><div class="sheet-content"><div class="sheet-card"><div class="empty" id="callsEmpty">Loading recent calls...</div><div class="call-list" id="callsList" hidden></div></div></div></div></section>
+    <section class="sheet" id="detailsSheet" aria-hidden="true"><div class="sheet-shell"><div class="sheet-grab"></div><div class="sheet-head"><div><div class="mini-label">Details</div><div class="sheet-title">Stream and Selection</div></div><button class="icon-btn" data-close-sheet="detailsSheet" type="button" aria-label="Close details">×</button></div><div class="sheet-content"><div class="sheet-card"><div class="kv"><div class="kv-key">Selection</div><div class="kv-value" id="selectedLabel">Live stream</div></div><div class="kv"><div class="kv-key">Started</div><div class="kv-value" id="selectedStarted">--</div></div><div class="kv"><div class="kv-key">Duration</div><div class="kv-value" id="selectedDuration">--</div></div><div class="kv"><div class="kv-key">Availability</div><div class="kv-value" id="selectedAvailability">Live</div></div><div class="kv"><div class="kv-key">Status</div><div class="kv-value" id="streamStatusValue">Waiting</div></div><div class="kv"><div class="kv-key">Raw Log</div><div class="kv-value" id="selectedRaw">Live stream follows current scanner metadata.</div></div></div></div></div></section>
+    <section class="sheet" id="settingsSheet" aria-hidden="true"><div class="sheet-shell"><div class="sheet-grab"></div><div class="sheet-head"><div><div class="mini-label">More</div><div class="sheet-title">Settings</div></div><button class="icon-btn" data-close-sheet="settingsSheet" type="button" aria-label="Close settings">×</button></div><div class="sheet-content"><div class="sheet-card"><div class="range-row"><div class="mini-label">Volume</div><input id="volumeSlider" type="range" min="0" max="100" value="85"><div class="subline" id="volumeValue">85%</div></div></div><div class="sheet-card"><button class="sheet-action" id="sheetInstallButton" type="button" hidden><strong>Install Mobile App</strong><span>Add to home screen</span></button><a class="sheet-action" id="rawLink" href="#" target="_blank" rel="noopener"><strong>Open Raw Stream</strong><span id="rawLinkLabel">Not available</span></a></div></div></div></section>
+    <audio id="mobileAudio" preload="none" playsinline></audio>
+    <script>
+        const audioEl = document.getElementById('mobileAudio');
+        const playButton = document.getElementById('playButton');
+        const playGlyph = document.getElementById('playGlyph');
+        const playLabel = document.getElementById('playLabel');
+        const playbackBadge = document.getElementById('playbackBadge');
+        const playbackState = document.getElementById('playbackState');
+        const sessionState = document.getElementById('sessionState');
+        const channelDisplay = document.getElementById('channelDisplay');
+        const nowPlayingText = document.getElementById('nowPlayingText');
+        const modeValue = document.getElementById('modeValue');
+        const freqValue = document.getElementById('freqValue');
+        const deviceValue = document.getElementById('deviceValue');
+        const updatedValue = document.getElementById('updatedValue');
+        const viewValue = document.getElementById('viewValue');
+        const streamMini = document.getElementById('streamMini');
+        const streamChip = document.getElementById('streamChip');
+        const slider = document.getElementById('historySlider');
+        const sliderCaption = document.getElementById('sliderCaption');
+        const sliderValueLabel = document.getElementById('sliderValueLabel');
+        const timelineNotches = document.getElementById('timelineNotches');
+        const callsSummary = document.getElementById('callsSummary');
+        const detailsSummary = document.getElementById('detailsSummary');
+        const settingsSummary = document.getElementById('settingsSummary');
+        const callsEmpty = document.getElementById('callsEmpty');
+        const callsList = document.getElementById('callsList');
+        const selectedLabel = document.getElementById('selectedLabel');
+        const selectedStarted = document.getElementById('selectedStarted');
+        const selectedDuration = document.getElementById('selectedDuration');
+        const selectedAvailability = document.getElementById('selectedAvailability');
+        const streamStatusValue = document.getElementById('streamStatusValue');
+        const selectedRaw = document.getElementById('selectedRaw');
+        const installButton = document.getElementById('installButton');
+        const sheetInstallButton = document.getElementById('sheetInstallButton');
+        const rawLink = document.getElementById('rawLink');
+        const rawLinkLabel = document.getElementById('rawLinkLabel');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeValue = document.getElementById('volumeValue');
+        const sheetBackdrop = document.getElementById('sheetBackdrop');
+        const prevButton = document.getElementById('prevButton');
+        const nextButton = document.getElementById('nextButton');
+        const liveButton = document.getElementById('liveButton');
+        let latestStatus = null, recentCalls = [], selectedCallIndex = -1, selectedCallId = '', playerMode = 'live', peerConnection = null, playerStarting = false, userPaused = false, lastStreamUrl = '', deferredInstallPrompt = null;
+        function formatDuration(seconds) { const value = Number(seconds); if (!Number.isFinite(value)) return '--'; const total = Math.max(0, Math.round(value)); const mins = Math.floor(total / 60); const secs = total % 60; return mins ? `${mins}m ${String(secs).padStart(2, '0')}s` : `${secs}s`; }
+        function escapeHtml(value) { return String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
+        function getSelectedCall() { return playerMode !== 'replay' || selectedCallIndex < 0 || selectedCallIndex >= recentCalls.length ? null : recentCalls[selectedCallIndex] || null; }
+        function setSessionState(text) { sessionState.textContent = text; }
+        function setPlaybackState(text, stateClass) { playbackState.textContent = text; playbackBadge.classList.remove('is-live', 'is-replay', 'is-paused', 'is-offline'); if (stateClass) playbackBadge.classList.add(stateClass); }
+        function setVolume(value) { const next = Math.max(0, Math.min(100, Number(value) || 0)); audioEl.volume = next / 100; volumeSlider.value = String(next); volumeValue.textContent = `${next}%`; }
+        function closePeerConnection() { if (!peerConnection) return; try { peerConnection.ontrack = null; } catch (err) {} try { peerConnection.close(); } catch (err) {} peerConnection = null; }
+        function clearAudioSource() { audioEl.pause(); audioEl.removeAttribute('src'); audioEl.srcObject = null; audioEl.load(); }
+        function closePlayer() { closePeerConnection(); clearAudioSource(); playerStarting = false; updateUi(); }
+        function waitForIceComplete(pc, timeoutMs) { return new Promise((resolve) => { if (pc.iceGatheringState === 'complete') { resolve(); return; } const timeout = setTimeout(done, timeoutMs); function onChange() { if (pc.iceGatheringState === 'complete') done(); } function done() { clearTimeout(timeout); pc.removeEventListener('icegatheringstatechange', onChange); resolve(); } pc.addEventListener('icegatheringstatechange', onChange); }); }
+        function sliderIndexFromValue(value) { const total = recentCalls.length; if (!total || value >= total) return -1; return total - 1 - value; }
+        function sliderValueFromIndex(index) { return index < 0 ? recentCalls.length : recentCalls.length - 1 - index; }
+        function setMediaAction(action, handler) { if (!('mediaSession' in navigator)) return; try { navigator.mediaSession.setActionHandler(action, handler); } catch (err) {} }
+        function updateTimelineNotches() {
+            const total = Math.max(12, Math.min(30, recentCalls.length || 18));
+            const currentValue = playerMode === 'live' ? recentCalls.length : sliderValueFromIndex(selectedCallIndex);
+            const livePosition = recentCalls.length;
+            const items = [];
+            for (let i = 0; i < total; i += 1) {
+                const ratio = total === 1 ? 1 : i / (total - 1);
+                const height = 8 + Math.round((Math.sin((i + 1) * 1.37) * 0.5 + 0.5) * 16);
+                let className = 'timeline-notch';
+                if (!recentCalls.length) className += ' is-dim';
+                const mappedValue = Math.round(ratio * livePosition);
+                if (mappedValue === currentValue) className += ' is-current';
+                items.push(`<span class="${className}" style="height:${height}px"></span>`);
+            }
+            timelineNotches.innerHTML = items.join('');
+        }
+        function updateSliderUi() {
+            const total = recentCalls.length;
+            slider.disabled = total === 0;
+            slider.min = '0';
+            slider.max = String(Math.max(0, total));
+            slider.value = String(playerMode === 'live' ? total : sliderValueFromIndex(selectedCallIndex));
+            if (playerMode === 'live') {
+                sliderCaption.textContent = total ? 'Live mode. Press previous to load the newest recent transmission.' : 'Live mode. No completed calls are available yet.';
+                sliderValueLabel.textContent = 'Live Now';
+            } else {
+                const item = getSelectedCall();
+                sliderCaption.textContent = item ? `Replay mode. ${item.started_at_label || 'Historic call'}` : 'Replay selected';
+                sliderValueLabel.textContent = item ? formatDuration(item.duration_seconds) : 'Replay';
+            }
+            updateTimelineNotches();
+        }
+        function updateInstallUi() { const visible = !!deferredInstallPrompt; installButton.hidden = !visible; sheetInstallButton.hidden = !visible; }
+        function updateSelectionMeta() { const item = getSelectedCall(); if (!item) { selectedLabel.textContent = 'Live stream'; selectedStarted.textContent = latestStatus && latestStatus.updated_at ? latestStatus.updated_at : '--'; selectedDuration.textContent = 'Live'; selectedAvailability.textContent = latestStatus && latestStatus.streaming_enabled ? 'Live available' : 'Streaming disabled'; selectedRaw.textContent = 'Live stream follows current scanner metadata.'; return; } selectedLabel.textContent = item.label || 'Unknown channel'; selectedStarted.textContent = item.started_at_label || '--'; selectedDuration.textContent = formatDuration(item.duration_seconds); selectedAvailability.textContent = item.file_exists ? 'Replay ready' : 'Audio missing'; selectedRaw.textContent = item.raw_log_line || 'No raw log line available.'; }
+        function updateNowPlaying() { const item = getSelectedCall(); const channel = latestStatus && latestStatus.display ? latestStatus.display : '---'; channelDisplay.textContent = item ? (item.label || channel) : channel; if (item) { nowPlayingText.textContent = `${item.frequency || '--'} • ${item.mode || '--'} • replay`; } else { const state = latestStatus ? (latestStatus.stream_status || 'OFF').toUpperCase() : 'OFF'; nowPlayingText.textContent = `${latestStatus && latestStatus.frequency ? latestStatus.frequency : '--'} • ${latestStatus && latestStatus.mode ? latestStatus.mode : '--'} • ${state.toLowerCase()}`; } }
+        function updateQuickSummaries() { callsSummary.textContent = recentCalls.length ? `${recentCalls.length} saved calls` : 'No recent calls'; detailsSummary.textContent = playerMode === 'live' ? 'Live stream selected' : 'Replay selected'; settingsSummary.textContent = deferredInstallPrompt ? 'Install available' : 'Volume and stream link'; }
+        function updateCallsList() { if (!recentCalls.length) { callsEmpty.hidden = false; callsEmpty.textContent = 'No recent calls are available yet.'; callsList.hidden = true; callsList.innerHTML = ''; return; } callsEmpty.hidden = true; callsList.hidden = false; callsList.innerHTML = recentCalls.map((item, index) => { const isActive = playerMode === 'replay' && index === selectedCallIndex; const availability = item.file_exists ? 'ready' : 'missing'; return `<button class="call-row${isActive ? ' is-active' : ''}" type="button" data-call-index="${index}"><div class="call-top"><span>${escapeHtml(item.label || 'Unknown channel')}</span><span>${escapeHtml(formatDuration(item.duration_seconds))}</span></div><div class="call-meta"><span>${escapeHtml(item.frequency || '--')}</span><span>${escapeHtml(item.mode || '--')}</span><span>${escapeHtml(item.started_at_label || '--')}</span><span>${escapeHtml(availability)}</span></div></button>`; }).join(''); }
+        function updateButtons() {
+            const isPlaying = !audioEl.paused && !audioEl.ended;
+            const liveReady = !!(latestStatus && latestStatus.streaming_enabled && latestStatus.raw_stream_url);
+            playLabel.textContent = playerStarting ? 'Wait' : isPlaying ? 'Pause' : 'Play';
+            playGlyph.textContent = playerStarting ? '…' : isPlaying ? '❚❚' : '▶';
+            playButton.classList.remove('is-paused', 'is-offline');
+            liveButton.classList.toggle('is-active', playerMode === 'live');
+            prevButton.disabled = !recentCalls.length || (playerMode === 'replay' && selectedCallIndex >= recentCalls.length - 1);
+            nextButton.disabled = !recentCalls.length || playerMode === 'live' || selectedCallIndex <= 0;
+            if (playerStarting) {
+                playButton.classList.add('is-paused');
+                setPlaybackState('Connecting', 'is-paused');
+            } else if (isPlaying) {
+                setPlaybackState(playerMode === 'live' ? 'Playing Live' : 'Playing Replay', playerMode === 'live' ? 'is-live' : 'is-replay');
+            } else if (userPaused) {
+                playButton.classList.add('is-paused');
+                setPlaybackState('Paused', 'is-paused');
+            } else if (playerMode === 'live' && !liveReady) {
+                playButton.classList.add('is-offline');
+                setPlaybackState('Stream Off', 'is-offline');
+            } else if (playerMode === 'replay') {
+                setPlaybackState('Replay Ready', 'is-replay');
+            } else {
+                setPlaybackState('Standby Live', 'is-offline');
+            }
+        }
+        function updateDetailsFromStatus() { const streamState = latestStatus ? (latestStatus.stream_status || 'OFF').toUpperCase() : 'OFF'; modeValue.textContent = latestStatus && latestStatus.mode ? latestStatus.mode : '---'; freqValue.textContent = latestStatus && latestStatus.frequency ? latestStatus.frequency : '---'; deviceValue.textContent = `Device ${latestStatus && latestStatus.audio_device ? latestStatus.audio_device : '---'}`; updatedValue.textContent = latestStatus && latestStatus.updated_at ? `Updated ${latestStatus.updated_at}` : 'Updated --'; streamStatusValue.textContent = latestStatus ? `${streamState} • ${latestStatus.streaming_enabled ? 'streaming enabled' : 'streaming disabled'}` : 'Waiting'; const rawUrl = latestStatus && latestStatus.raw_stream_url ? latestStatus.raw_stream_url : ''; rawLink.href = rawUrl ? `${rawUrl}/` : '#'; rawLinkLabel.textContent = rawUrl || 'Not available'; }
+        function updateDisplayChips() {
+            const playbackText = playbackState.textContent || 'Idle';
+            const stateClass = playbackBadge.classList.contains('is-live') ? 'live' : playbackBadge.classList.contains('is-replay') ? 'replay' : playbackBadge.classList.contains('is-paused') ? 'paused' : 'offline';
+            streamMini.textContent = stateClass === 'live' ? 'Live' : stateClass === 'replay' ? 'Replay' : stateClass === 'paused' ? 'Pause' : 'Idle';
+            viewValue.textContent = playerMode === 'live' ? 'Live' : 'Replay';
+            streamChip.classList.remove('live', 'replay', 'paused', 'offline');
+            streamChip.classList.add(stateClass);
+            streamChip.title = playbackText;
+        }
+        function updateMediaSession() { if (!('mediaSession' in navigator)) return; const item = getSelectedCall(); const title = item ? (item.label || 'Replay') : (latestStatus && latestStatus.display ? latestStatus.display : 'Scanner Mobile'); const artist = item ? `${item.frequency || '--'} • ${item.mode || '--'}` : `${latestStatus && latestStatus.frequency ? latestStatus.frequency : '--'} • ${latestStatus && latestStatus.mode ? latestStatus.mode : '--'}`; navigator.mediaSession.metadata = new MediaMetadata({ title, artist, album: playerMode === 'live' ? 'Live scanner stream' : 'Recent call replay', artwork: [{ src: '/m/icons/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/m/icons/icon-512.png', sizes: '512x512', type: 'image/png' }] }); navigator.mediaSession.playbackState = !audioEl.paused && !audioEl.ended ? 'playing' : 'paused';
+        setMediaAction('play', async () => { if (playerMode === 'live' && (!peerConnection || peerConnection.connectionState === 'closed' || peerConnection.connectionState === 'failed')) { userPaused = false; await startLive(false); return; } userPaused = false; await audioEl.play(); updateUi(); });
+        setMediaAction('pause', () => { userPaused = true; audioEl.pause(); updateUi(); });
+        setMediaAction('previoustrack', async () => { if (!recentCalls.length) return; if (playerMode === 'live') { await playReplay(0, true); return; } const targetIndex = Math.min(recentCalls.length - 1, selectedCallIndex + 1); if (targetIndex !== selectedCallIndex) await playReplay(targetIndex, true); });
+        setMediaAction('nexttrack', async () => { if (playerMode !== 'replay' || !recentCalls.length) { await startLive(false); return; } const targetIndex = Math.max(0, selectedCallIndex - 1); if (targetIndex !== selectedCallIndex) { await playReplay(targetIndex, true); } else { await startLive(false); } });
+        if (playerMode === 'replay' && Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
+            setMediaAction('seekbackward', (details) => { audioEl.currentTime = Math.max(0, audioEl.currentTime - (details.seekOffset || 10)); });
+            setMediaAction('seekforward', (details) => { audioEl.currentTime = Math.min(audioEl.duration, audioEl.currentTime + (details.seekOffset || 10)); });
+            if ('setPositionState' in navigator.mediaSession) {
+                try { navigator.mediaSession.setPositionState({ duration: audioEl.duration, playbackRate: audioEl.playbackRate || 1, position: audioEl.currentTime || 0 }); } catch (err) {}
+            }
+        } else {
+            setMediaAction('seekbackward', null);
+            setMediaAction('seekforward', null);
+            if ('setPositionState' in navigator.mediaSession) { try { navigator.mediaSession.setPositionState(); } catch (err) {} }
+        }}
+        function updateUi() { updateNowPlaying(); updateSliderUi(); updateButtons(); updateCallsList(); updateSelectionMeta(); updateDetailsFromStatus(); updateDisplayChips(); updateQuickSummaries(); updateInstallUi(); updateMediaSession(); }
+        async function startLive(autoStart) { if (playerStarting) return; if (!latestStatus || !latestStatus.streaming_enabled || !latestStatus.raw_stream_url) { playerMode = 'live'; setSessionState('No stream available'); updateUi(); return; } closePlayer(); playerMode = 'live'; playerStarting = true; userPaused = false; setSessionState('Negotiating live WebRTC session'); updateUi(); try { const pc = new RTCPeerConnection({ iceServers: [] }); peerConnection = pc; pc.addTransceiver('audio', { direction: 'recvonly' }); pc.ontrack = async (event) => { const stream = event.streams[0]; if (!stream) return; audioEl.srcObject = stream; if (!userPaused || autoStart) { try { await audioEl.play(); } catch (err) { setSessionState('Press Play to start live audio'); setPlaybackState('Awaiting Click', 'is-paused'); } } updateUi(); }; pc.onconnectionstatechange = () => { const state = pc.connectionState; if (state === 'connected') { setSessionState('Live audio connected'); } else if (state === 'connecting') { setSessionState('Connecting to live stream'); } else if (state === 'failed' || state === 'disconnected' || state === 'closed') { setSessionState('Connection lost. Press Play to reconnect.'); if (playerMode === 'live') setPlaybackState('Connection Lost', 'is-offline'); } }; const offer = await pc.createOffer(); await pc.setLocalDescription(offer); await waitForIceComplete(pc, 1500); const response = await fetch('/api/whep', { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp, cache: 'no-store' }); if (!response.ok) throw new Error(`WHEP request failed with status ${response.status}`); const answer = await response.text(); await pc.setRemoteDescription({ type: 'answer', sdp: answer }); setSessionState('Waiting for live audio packets'); } catch (error) { closePlayer(); playerMode = 'live'; setSessionState(error && error.message ? error.message : 'Failed to start live player'); } finally { playerStarting = false; updateUi(); } }
+        async function playReplay(index, autoplay) { const item = recentCalls[index]; playerMode = 'replay'; selectedCallIndex = index; selectedCallId = item ? item.id : ''; closePeerConnection(); playerStarting = false; userPaused = false; if (!item) { updateUi(); return; } if (!item.file_exists || !item.playable_url) { clearAudioSource(); setSessionState('Selected call is missing its audio file'); setPlaybackState('Missing File', 'is-offline'); updateUi(); return; } audioEl.pause(); audioEl.srcObject = null; audioEl.src = item.playable_url; audioEl.load(); setSessionState(`Loaded replay from ${item.started_at_label || 'recent history'}`); if (autoplay) { try { await audioEl.play(); } catch (error) { setSessionState('Press Play to start replay audio'); setPlaybackState('Awaiting Click', 'is-paused'); } } updateUi(); }
+        function syncSelectionFromRecentCalls() { if (!recentCalls.length) { selectedCallIndex = -1; if (playerMode === 'replay') { selectedCallId = ''; setSessionState('Replay history is empty'); } updateUi(); return; } if (selectedCallId) selectedCallIndex = recentCalls.findIndex((item) => item.id === selectedCallId); if (selectedCallIndex < 0 && playerMode === 'replay') { selectedCallIndex = 0; selectedCallId = recentCalls[0].id; } updateUi(); }
+        async function loadRecentCalls() { try { const response = await fetch('/api/radio-calls?limit=30', { cache: 'no-store' }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const payload = await response.json(); recentCalls = Array.isArray(payload.items) ? payload.items : []; syncSelectionFromRecentCalls(); } catch (error) { recentCalls = []; syncSelectionFromRecentCalls(); callsEmpty.textContent = 'Recent calls could not be loaded.'; } }
+        async function refreshStatus() { try { const response = await fetch('/api/status', { cache: 'no-store' }); const data = await response.json(); latestStatus = data; const streamState = (data.stream_status || 'OFF').toUpperCase(); const rawUrl = data.raw_stream_url || ''; const ready = data.streaming_enabled && rawUrl && ['LIVE', 'READY'].includes(streamState); if (playerMode === 'live') { if (!ready) { closePeerConnection(); audioEl.pause(); audioEl.srcObject = null; setSessionState(data.streaming_enabled ? 'Waiting for live stream...' : 'Enable streaming in the scanner app'); lastStreamUrl = rawUrl; } else if ((!peerConnection || peerConnection.connectionState === 'closed' || peerConnection.connectionState === 'failed') && !playerStarting && !userPaused) { lastStreamUrl = rawUrl; startLive(true); } else if (rawUrl !== lastStreamUrl && !playerStarting && !userPaused) { lastStreamUrl = rawUrl; startLive(true); } else { lastStreamUrl = rawUrl; } } updateUi(); } catch (error) { setSessionState('Metadata request failed'); if (playerMode === 'live') setPlaybackState('Status Error', 'is-offline'); } }
+        function openSheet(id) { document.querySelectorAll('.sheet').forEach((node) => { const isOpen = node.id === id; node.classList.toggle('is-open', isOpen); node.setAttribute('aria-hidden', String(!isOpen)); }); sheetBackdrop.classList.toggle('is-open', !!id); document.body.style.overflow = id ? 'hidden' : ''; }
+        function closeSheets() { document.querySelectorAll('.sheet').forEach((node) => { node.classList.remove('is-open'); node.setAttribute('aria-hidden', 'true'); }); sheetBackdrop.classList.remove('is-open'); document.body.style.overflow = ''; }
+        async function promptInstall() { if (!deferredInstallPrompt) return; deferredInstallPrompt.prompt(); try { await deferredInstallPrompt.userChoice; } catch (error) {} deferredInstallPrompt = null; updateInstallUi(); }
+        async function onPlayButton() { if (playerMode === 'live') { if (!peerConnection || peerConnection.connectionState === 'closed' || peerConnection.connectionState === 'failed') { userPaused = false; await startLive(false); return; } if (audioEl.paused) { userPaused = false; try { await audioEl.play(); setSessionState('Live audio resumed'); } catch (error) { setSessionState('Browser blocked autoplay. Press Play again.'); setPlaybackState('Awaiting Click', 'is-paused'); } } else { userPaused = true; audioEl.pause(); setSessionState('Live audio paused locally'); } } else { const item = getSelectedCall(); if (!item) { setSessionState('Select a recent call first'); } else if (!item.file_exists || !item.playable_url) { setSessionState('This recent call is missing its audio file'); } else if (audioEl.paused) { userPaused = false; try { await audioEl.play(); setSessionState('Replay resumed'); } catch (error) { setSessionState('Press Play again to start replay audio'); } } else { userPaused = true; audioEl.pause(); setSessionState('Replay paused'); } } updateUi(); }
+        playButton.addEventListener('click', onPlayButton);
+        prevButton.addEventListener('click', async () => {
+            if (!recentCalls.length) return;
+            if (playerMode === 'live') {
+                await playReplay(0, true);
+                return;
+            }
+            const targetIndex = Math.min(recentCalls.length - 1, selectedCallIndex + 1);
+            if (targetIndex !== selectedCallIndex) await playReplay(targetIndex, true);
+        });
+        nextButton.addEventListener('click', async () => {
+            if (playerMode !== 'replay' || !recentCalls.length) return;
+            const targetIndex = Math.max(0, selectedCallIndex - 1);
+            if (targetIndex !== selectedCallIndex) {
+                await playReplay(targetIndex, true);
+            } else {
+                await startLive(false);
+            }
+        });
+        liveButton.addEventListener('click', async () => {
+            selectedCallIndex = -1;
+            selectedCallId = '';
+            await startLive(false);
+        });
+        slider.addEventListener('input', () => { const total = recentCalls.length; if (!total) return; const value = Number(slider.value); if (value >= total) { sliderCaption.textContent = 'Release to return to live audio'; sliderValueLabel.textContent = 'Live'; return; } const index = sliderIndexFromValue(value); const item = recentCalls[index]; if (item) { sliderCaption.textContent = item.started_at_label || 'Historic call'; sliderValueLabel.textContent = formatDuration(item.duration_seconds); } });
+        slider.addEventListener('change', async () => { const total = recentCalls.length; if (!total) return; const value = Number(slider.value); const shouldAutoplay = !audioEl.paused && !userPaused; if (value >= total) { selectedCallIndex = -1; selectedCallId = ''; await startLive(shouldAutoplay); return; } const index = sliderIndexFromValue(value); await playReplay(index, shouldAutoplay); });
+        volumeSlider.addEventListener('input', (event) => setVolume(event.target.value));
+        document.getElementById('openCalls').addEventListener('click', () => openSheet('callsSheet'));
+        document.getElementById('openDetails').addEventListener('click', () => openSheet('detailsSheet'));
+        document.getElementById('openSettings').addEventListener('click', () => openSheet('settingsSheet'));
+        sheetBackdrop.addEventListener('click', closeSheets);
+        document.querySelectorAll('[data-close-sheet]').forEach((button) => button.addEventListener('click', closeSheets));
+        callsList.addEventListener('click', async (event) => { const button = event.target.closest('[data-call-index]'); if (!button) return; const index = Number(button.getAttribute('data-call-index')); closeSheets(); await playReplay(index, true); });
+        installButton.addEventListener('click', promptInstall);
+        sheetInstallButton.addEventListener('click', promptInstall);
+        window.addEventListener('beforeinstallprompt', (event) => { event.preventDefault(); deferredInstallPrompt = event; updateInstallUi(); });
+        window.addEventListener('appinstalled', () => { deferredInstallPrompt = null; updateInstallUi(); });
+        audioEl.addEventListener('play', updateUi);
+        audioEl.addEventListener('pause', updateUi);
+        audioEl.addEventListener('timeupdate', updateMediaSession);
+        audioEl.addEventListener('durationchange', updateMediaSession);
+        audioEl.addEventListener('ended', () => { if (playerMode === 'replay') setSessionState('Replay ended. Drag right or press Live to return to the current stream.'); updateUi(); });
+        audioEl.addEventListener('error', () => { setSessionState(playerMode === 'live' ? 'Live playback failed' : 'Replay playback failed'); setPlaybackState('Playback Error', 'is-offline'); updateUi(); });
+        document.addEventListener('visibilitychange', updateMediaSession);
+        if ('serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('/m/sw.js', { scope: '/m/' }).catch(() => {}); });
+        setVolume(85);
+        setPlaybackState('Stopped', 'is-offline');
+        updateUi();
+        Promise.all([loadRecentCalls(), refreshStatus()]).then(() => { if (latestStatus && latestStatus.streaming_enabled && latestStatus.raw_stream_url) startLive(true); });
+        setInterval(refreshStatus, 1000);
+        setInterval(loadRecentCalls, 4000);
+    </script>
+</body>
+</html>

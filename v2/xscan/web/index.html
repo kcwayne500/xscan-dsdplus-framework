@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#071119">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>XScan V2</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles.css?v=8">
+</head>
+<body>
+  <div id="authGate" class="auth-gate">
+    <form id="authForm" class="auth-card">
+      <div class="brand-mark">XS</div>
+      <p class="eyebrow">DSDPLUS RADIO CONSOLE</p>
+      <h1 id="authTitle">XScan V2</h1>
+      <p id="authCopy" class="muted">Checking administrator access…</p>
+      <label id="passwordLabel" hidden>Password<input id="passwordInput" type="password" autocomplete="current-password" minlength="12"></label>
+      <label id="confirmLabel" hidden>Confirm password<input id="confirmInput" type="password" autocomplete="new-password" minlength="12"></label>
+      <button id="authSubmit" class="button primary wide" type="submit" hidden>Continue</button>
+      <p id="authError" class="form-error"></p>
+    </form>
+  </div>
+
+  <div id="appShell" class="app-shell" hidden>
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark small">XS</span><span><strong>XScan</strong><small>Radio Console V2</small></span></div>
+      <nav id="navigation">
+        <a href="#dashboard" data-route="dashboard">Dashboard</a>
+        <a href="#calls" data-route="calls">Calls</a>
+        <a href="#scanlists" data-route="scanlists">Scanlists</a>
+        <a href="#dsdplus" data-route="dsdplus">DSDPlus Data</a>
+        <a href="#devices" data-route="devices">Devices</a>
+        <a href="#diagnostics" data-route="diagnostics">Diagnostics</a>
+        <a href="#settings" data-route="settings">Settings</a>
+      </nav>
+      <div class="sidebar-foot"><span id="hostDot" class="status-dot"></span><span id="hostSummary">Connecting</span></div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <button class="icon-button mobile-menu-button" data-action="mobile-menu" title="Open navigation" aria-label="Open navigation">☰</button>
+        <div class="topbar-title"><p class="eyebrow" id="pageEyebrow">XSCAN SYSTEM</p><h1 id="pageTitle">Dashboard</h1></div>
+        <div class="top-actions">
+          <button class="icon-button mobile-audio-button" data-action="player-primary" title="Live audio" aria-label="Play or pause live audio"><span class="player-toggle-icon">▶</span></button>
+          <span id="networkBadge" class="badge good">PUBLIC HTTPS</span>
+          <button class="icon-button" data-action="refresh" title="Refresh">↻</button>
+          <button class="avatar" data-action="logout" title="Sign out">AD</button>
+        </div>
+      </header>
+      <div id="connectionBanner" class="connection-banner" hidden></div>
+      <main id="view" class="view"></main>
+    </div>
+
+    <section id="persistentPlayer" class="persistent-player">
+      <div class="player-meta"><span class="live-dot player-live-dot"></span><span><small id="playerMode" class="player-status-mode">BROWSER LISTENING</small><strong id="playerLabel" class="player-status-label">Press Listen Live to hear the scanner</strong></span></div>
+      <div class="player-controls">
+        <button class="button primary" data-action="player-primary" title="Listen to or pause audio in this browser"><span class="player-primary-label">Listen Live</span></button>
+        <button class="button subtle player-return-live" data-action="player-live" title="Switch from a recording to live scanner audio" hidden>Live</button>
+        <input id="playerSeek" type="range" min="0" max="1000" value="0" aria-label="Playback position" hidden>
+        <input id="playerVolume" type="range" min="0" max="100" value="85" aria-label="Volume">
+      </div>
+      <audio id="audioElement" playsinline></audio>
+    </section>
+
+    <button id="drawerBackdrop" class="drawer-backdrop" data-action="mobile-menu-close" aria-label="Close navigation"></button>
+    <aside id="mobileDrawer" class="mobile-drawer" aria-label="Mobile navigation">
+      <div class="drawer-head"><div class="brand"><span class="brand-mark small">XS</span><span><strong>XScan</strong><small>Radio Console</small></span></div><button class="icon-button" data-action="mobile-menu-close" aria-label="Close navigation">×</button></div>
+      <nav><a href="#dashboard" data-route="dashboard">Live scanner</a><a href="#calls" data-route="calls">Recorded calls</a><a href="#scanlists" data-route="scanlists">Scanlists</a><a href="#devices" data-route="devices">Audio devices</a><a href="#dsdplus" data-route="dsdplus">DSDPlus data</a><a href="#diagnostics" data-route="diagnostics">Diagnostics</a><a href="#settings" data-route="settings">Settings & app</a></nav>
+      <p class="drawer-note"><span class="badge good">OPTIONAL HTTPS</span> Configure your own domain before exposing XScan publicly.</p>
+    </aside>
+  </div>
+  <dialog id="callDialog" class="call-dialog">
+    <form method="dialog" class="dialog-card">
+      <div class="card-head"><div><p class="eyebrow">CALL DETAILS</p><h2 id="dialogCallTitle">Recorded call</h2></div><button class="icon-button" value="cancel">×</button></div>
+      <div id="dialogCallMeta" class="call-detail-grid"></div>
+      <label>Tags, separated by commas<input id="dialogCallTags"></label>
+      <label>Notes<textarea id="dialogCallNote" class="note-area"></textarea></label>
+      <div class="button-row"><button class="button primary" type="button" data-action="save-call-details">Save details</button><a id="dialogCallDownload" class="button" download>Download audio</a><button class="button subtle" value="cancel">Close</button></div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast"></div>
+  <script src="/vendor/hls.min.js?v=1.6.13"></script>
+  <script type="module" src="/app.js?v=8"></script>
+</body>
+</html>

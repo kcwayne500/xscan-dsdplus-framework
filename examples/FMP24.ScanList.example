@@ -1,0 +1,13 @@
+; XScan starter scan list. Replace this example with frequencies and modes
+; that are legal to monitor in your location. DSDPlus/FMP24 uses this file.
+;
+; frequency  mode       options                  description
+162.5500     FM         BW=15.0 DELAY=2           NOAA Weather Radio example
+;
+; Common syntax examples (disabled until you supply real frequencies):
+;155.0000    FM         BW=11.0 DELAY=3           Analog narrowband example
+;155.0000    NEXEDGE48  BW=6.25 DELAY=3           NXDN48 example
+;155.0000    DMR        BW=12.5 DELAY=3           DMR example
+;155.0000    P25        BW=12.5 DELAY=3           P25 conventional example
+;
+; XScan and DSDPlus cannot decrypt encrypted radio traffic.

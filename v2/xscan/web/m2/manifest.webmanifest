@@ -1,0 +1,23 @@
+{
+  "id": "/m2/",
+  "name": "XScan M2 Quick Listen",
+  "short_name": "XScan M2",
+  "description": "Lightweight low-latency WebRTC scanner player and call tape.",
+  "start_url": "/m2/",
+  "scope": "/m2/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#080d12",
+  "theme_color": "#101820",
+  "categories": ["music", "utilities"],
+  "icons": [
+    {"src": "/icons/xscan-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/icons/xscan-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+    {"src": "/icons/xscan-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "/icons/xscan-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {"name": "Listen Live", "short_name": "Live", "url": "/m2/"},
+    {"name": "Recent Calls", "short_name": "Calls", "url": "/m2/?tab=calls"}
+  ]
+}

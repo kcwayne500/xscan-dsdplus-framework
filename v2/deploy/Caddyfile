@@ -1,0 +1,25 @@
+{
+	acme_ca https://acme-v02.api.letsencrypt.org/directory
+}
+
+__XSCAN_DOMAIN__ {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	reverse_proxy __XSCAN_BACKEND__
+
+	log {
+		output file __XSCAN_LOG_ROOT__/access.log {
+			roll_size 10MiB
+			roll_keep 10
+			roll_keep_for 720h
+		}
+		format json
+	}
+}

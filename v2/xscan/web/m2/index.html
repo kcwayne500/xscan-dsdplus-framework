@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101820">
+  <meta name="description" content="Fast, low-latency XScan M2 mobile listener">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="XScan M2">
+  <link rel="manifest" href="/m2/manifest.webmanifest">
+  <link rel="icon" href="/icons/xscan-192.png">
+  <link rel="stylesheet" href="/m2/m2.css">
+  <link rel="stylesheet" href="/m2/compact.css?v=7">
+  <title>XScan M2</title>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-kicker">XSCAN MOBILE</span><strong>M2 QUICK LISTEN</strong></div>
+      <button id="installButton" class="install-button" type="button" hidden>Install</button>
+      <div id="connectionPill" class="status-pill offline"><i></i><span>OFFLINE</span></div>
+    </header>
+
+    <section id="lcd" class="lcd-panel offline" aria-live="polite">
+      <div class="lcd-topline"><span id="lcdMode">FM</span><span id="lcdState">STANDBY</span><span id="lcdClock">--:--:--</span></div>
+      <div id="lcdFrequency" class="lcd-frequency">---.----</div>
+      <div id="lcdChannel" class="lcd-channel">WAITING FOR SCANNER</div>
+      <div class="lcd-bottomline"><span id="lcdDetail">TAP LISTEN TO START</span><span id="lcdRecord">REC OFF</span></div>
+    </section>
+
+    <nav class="tabs" aria-label="M2 player views">
+      <button class="tab active" type="button" data-tab="live">LIVE</button>
+      <button class="tab" type="button" data-tab="calls">REWIND <span id="callCount">0</span></button>
+    </nav>
+
+    <section id="livePanel" class="tab-panel active">
+      <article class="panel meter-panel">
+        <div class="panel-heading"><div><span class="micro-label">AUDIO METER</span><h1>Decoded signal</h1></div><strong id="meterReadout">−∞ dB</strong></div>
+        <div id="audioMeter" class="audio-meter" role="meter" aria-label="Scanner audio level" aria-valuemin="-80" aria-valuemax="0" aria-valuenow="-80"></div>
+        <div class="meter-scale"><span>QUIET</span><span id="triggerReadout">TRIGGER</span><span>LOUD</span></div>
+      </article>
+
+      <article class="panel listen-panel">
+        <button id="listenButton" class="listen-button" type="button"><span class="listen-icon">▶</span><span><strong>LISTEN LIVE</strong><small>WebRTC · Opus low delay</small></span></button>
+        <p id="sessionMessage" class="session-message">Ready for one-tap listening.</p>
+        <label class="volume-row"><span>VOLUME</span><input id="volume" type="range" min="0" max="100" value="90"><output id="volumeValue">90%</output></label>
+      </article>
+
+      <div class="readout-grid">
+        <article class="readout"><span>STREAM</span><strong id="streamReadout">WAITING</strong></article>
+        <article class="readout"><span>PLAYER</span><strong id="playerReadout">STOPPED</strong></article>
+        <article class="readout wide"><span>AUDIO SOURCE</span><strong id="deviceReadout">SCANNER INPUT</strong></article>
+      </div>
+    </section>
+
+    <section id="callsPanel" class="tab-panel" hidden>
+      <article class="panel tape-panel">
+        <div class="panel-heading"><div><span class="micro-label">REWIND TIMELINE</span><h1>One notch per stored call</h1></div><button id="jumpLiveButton" class="live-chip" type="button">RETURN LIVE</button></div>
+        <div class="duration-key"><span class="short">SHORT</span><span class="medium">MEDIUM</span><span class="long">LONG</span><span class="very-long">VERY LONG</span></div>
+        <div id="callTape" class="call-tape sequence-tape" aria-label="Stored calls from older to newer"><div class="tape-empty">Waiting for completed calls</div></div>
+        <div class="tape-scale"><span id="tapeStart">OLDER</span><span>ONE NOTCH = ONE CALL</span><span>NEWER</span></div>
+        <p id="sliderCaption" class="session-message">Tap a notch to load that call. Use Return Live when you are done.</p>
+      </article>
+
+      <article id="selectedCall" class="panel selected-call">
+        <span class="micro-label">SELECTED CALL</span>
+        <div class="selected-row"><div><h2 id="selectedLabel">Live stream</h2><p id="selectedMeta">No replay selected</p></div><button id="replayButton" class="replay-button" type="button" disabled>REPLAY</button></div>
+      </article>
+
+      <div id="recentCalls" class="recent-calls"></div>
+    </section>
+  </main>
+
+  <audio id="audio" preload="none" playsinline></audio>
+  <script src="/m2/m2.js?v=7" defer></script>
+</body>
+</html>
