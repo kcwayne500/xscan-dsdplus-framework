@@ -15,5 +15,7 @@ def test_recording_log_import_is_idempotent(app_paths):
     settings = SettingsStore(app_paths)
     database = Database(app_paths)
     migrator = Migrator(app_paths, settings, database, Logger())
-    migrator.run(); migrator.run()
+    migrator.run()
+    database.add_call = lambda _call: (_ for _ in ()).throw(AssertionError("unchanged log was re-imported"))
+    migrator.run()
     assert database.list_calls()["total"] == 1

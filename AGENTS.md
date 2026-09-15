@@ -2,7 +2,8 @@
 
 This repository is the source of truth for XScan. An AI agent helping with a
 fresh installation must read this file and `docs/NEW_MACHINE_INSTALL.md` before
-changing the machine.
+changing the machine. For normal production start, stop, restart, health, or
+recovery work on the installed host, read `docs/OPERATIONS.md` first.
 
 ## Never put these in Git
 
@@ -59,3 +60,21 @@ XScan, and preserves existing XScan settings through the V2 installer.
 Do not guess radio gain, PPM, device index, frequencies, or audio endpoints.
 Preserve the transferred FMP24 configuration initially, then tune one variable
 at a time using measured decode quality and I/Q-loss evidence.
+
+## Production operations on this host
+
+- Treat `C:\xscan-dsdplus\framework` on `main` as the V2 source checkout.
+- Start or recover production with
+  `%LOCALAPPDATA%\XScan\Start-XScan.ps1`.
+- Verify V2 at `http://127.0.0.1:8890/api/m2/status`, then run
+  `scripts\test-new-machine.ps1 -Cutover`.
+- Use the authenticated dashboard controls for normal scanner stop/restart.
+- Do not start the legacy root Python recorder or use
+  `C:\DSDPlusFastLane\scanner-recorder-repo` as the V2 source.
+- Preserve the single HKCU Run launcher. The `XScan V2` scheduled task is
+  intentionally disabled on this machine; do not add competing autostarts.
+- Do not claim audio or public-network acceptance from local processes and
+  ports alone.
+
+The complete commands, paths, expected process tree, ports, logs, and recovery
+rules are in `docs/OPERATIONS.md`.

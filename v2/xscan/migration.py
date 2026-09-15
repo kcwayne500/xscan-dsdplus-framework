@@ -39,32 +39,49 @@ class Migrator:
             state["legacy_settings_imported"] = True
         log_path = self.paths.recordings / "recordings_log.json"
         if log_path.is_file():
-            try:
-                entries = json.loads(log_path.read_text(encoding="utf-8"))
-                if isinstance(entries, list):
-                    for index, entry in enumerate(entries):
-                        if not isinstance(entry, dict):
-                            continue
-                        audio_file = str(entry.get("audio_file") or entry.get("mp3_file") or entry.get("wav_file") or "")
-                        audio_path = self.paths.recordings / Path(audio_file).name if audio_file else None
-                        call = dict(entry)
-                        call.update(
-                            {
-                                "source_ref": f"legacy:{log_path}:{index}",
-                                "audio_file": Path(audio_file).name if audio_file else "",
-                                "audio_codec": audio_path.suffix.lstrip(".").lower() if audio_path else "",
-                                "audio_bytes": audio_path.stat().st_size if audio_path and audio_path.is_file() else 0,
-                            }
-                        )
-                        before = self.database.list_calls(search="", state="active", offset=0, limit=1)["total"]
-                        self.database.add_call(call)
-                        after = self.database.list_calls(search="", state="active", offset=0, limit=1)["total"]
-                        imported_calls += max(0, after - before)
-            except (OSError, json.JSONDecodeError) as exc:
-                self.logger.warning("Legacy recording log import failed: %s", exc)
+            stat = log_path.stat()
+            fingerprint = {"size": stat.st_size, "mtime_ns": stat.st_mtime_ns}
+            previous_fingerprint = state.get("recordings_log_fingerprint")
+            # Releases before the fingerprint marker could complete a full
+            # import but then repeated all legacy rows on every startup.  A
+            # completed prior run is safe to mark with the current immutable
+            # log fingerprint; source_ref uniqueness already made that import
+            # idempotent.
+            if previous_fingerprint is None and int(state.get("last_imported_calls") or 0) > 0:
+                state["recordings_log_fingerprint"] = fingerprint
+            elif previous_fingerprint != fingerprint:
+                imported_calls = self._import_recording_log(log_path)
+                state["recordings_log_fingerprint"] = fingerprint
         state.update({"last_run_at": datetime.now(UTC).isoformat(), "last_imported_calls": imported_calls})
         self.paths.migration.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
         return {"settings": imported_settings, "calls": imported_calls, "state": state}
+
+    def _import_recording_log(self, log_path: Path) -> int:
+        imported_calls = 0
+        try:
+            entries = json.loads(log_path.read_text(encoding="utf-8"))
+            if isinstance(entries, list):
+                for index, entry in enumerate(entries):
+                    if not isinstance(entry, dict):
+                        continue
+                    audio_file = str(entry.get("audio_file") or entry.get("mp3_file") or entry.get("wav_file") or "")
+                    audio_path = self.paths.recordings / Path(audio_file).name if audio_file else None
+                    call = dict(entry)
+                    call.update(
+                        {
+                            "source_ref": f"legacy:{log_path}:{index}",
+                            "audio_file": Path(audio_file).name if audio_file else "",
+                            "audio_codec": audio_path.suffix.lstrip(".").lower() if audio_path else "",
+                            "audio_bytes": audio_path.stat().st_size if audio_path and audio_path.is_file() else 0,
+                        }
+                    )
+                    before = self.database.list_calls(search="", state="active", offset=0, limit=1)["total"]
+                    self.database.add_call(call)
+                    after = self.database.list_calls(search="", state="active", offset=0, limit=1)["total"]
+                    imported_calls += max(0, after - before)
+        except (OSError, json.JSONDecodeError) as exc:
+            self.logger.warning("Legacy recording log import failed: %s", exc)
+        return imported_calls
 
     def _load_state(self) -> dict[str, Any]:
         if self.paths.migration.is_file():

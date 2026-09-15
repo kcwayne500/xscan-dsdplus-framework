@@ -32,6 +32,13 @@ Replacing an existing host with a transferred Fast Lane directory is covered by
 also includes an AI automation contract in [`AGENTS.md`](AGENTS.md) and a
 rerunnable installer at `scripts\install-new-machine.ps1`.
 
+## Operating the installed scanner
+
+For the production paths, preferred launcher, dashboard controls, health
+checks, expected processes and ports, log locations, autostart behavior, and
+recovery procedure on the scanner host, use the
+[XScan V2 operations runbook](docs/OPERATIONS.md).
+
 ## Configuration
 
 All machine-specific locations can be supplied as setup parameters, command-line arguments, environment variables, or settings:
