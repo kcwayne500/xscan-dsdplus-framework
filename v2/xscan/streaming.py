@@ -44,7 +44,10 @@ def local_ipv4_addresses() -> list[str]:
 
 
 class StreamingManager:
-    def __init__(self, paths: AppPaths, settings: SettingsStore, state: RuntimeState, events: EventBus, logger: logging.Logger):
+    def __init__(self, paths: AppPaths, settings: SettingsStore, state: RuntimeState, events: EventBus, logger: logging.Logger, server=None, on_pcm=None):
+        self.server = server
+        self.on_pcm = on_pcm
+        self.sample_rate = 48000
         self.paths = paths
         self.settings = settings
         self.state = state
@@ -64,6 +67,10 @@ class StreamingManager:
         return bool(self.ffmpeg and self.mediamtx)
 
     def start(self, sample_rate: int) -> bool:
+        self.sample_rate = sample_rate
+        tools = self.settings.section("tools")
+        self.ffmpeg = _find_tool(self.paths, "ffmpeg", "ffmpeg.exe", str(tools.get("ffmpeg") or ""))
+        self.mediamtx = _find_tool(self.paths, "mediamtx", "mediamtx.exe", str(tools.get("mediamtx") or ""))
         config = self.settings.section("streaming")
         if not config["enabled"]:
             self.state.update_component("ffmpeg", "disabled", message="Live streaming is disabled")
@@ -80,54 +87,60 @@ class StreamingManager:
         webrtc_media_port = int(config["webrtc_media_port"])
         hls_port = int(config["hls_port"])
         stream_name = str(config["stream_name"])
-        media_config = self.paths.state / "mediamtx.generated.yml"
-        advertised_hosts = local_ipv4_addresses()
-        public_host = urlparse(str(self.settings.section("server").get("public_url") or "")).hostname
-        if public_host and public_host not in advertised_hosts:
-            advertised_hosts.append(public_host)
-        hosts = "\n".join(f"  - {address}" for address in advertised_hosts)
-        media_config.write_text(
-            "\n".join(
-                [
-                    "logLevel: warn",
-                    f"rtspAddress: :{rtsp_port}",
-                    f"webrtcAddress: :{webrtc_port}",
-                    f"webrtcLocalUDPAddress: :{webrtc_media_port}",
-                    f"webrtcLocalTCPAddress: :{webrtc_media_port}",
-                    "hls: yes",
-                    f"hlsAddress: 127.0.0.1:{hls_port}",
-                    "hlsAlwaysRemux: yes",
-                    "hlsVariant: lowLatency",
-                    "hlsSegmentCount: 7",
-                    "hlsSegmentDuration: 1s",
-                    "hlsPartDuration: 200ms",
-                    "rtmp: no",
-                    "api: no",
-                    "metrics: no",
-                    "pprof: no",
-                    "webrtcAdditionalHosts:",
-                    hosts,
-                    "paths:",
-                    f"  {stream_name}: {{}}",
-                    "",
-                ]
-            ),
-            encoding="utf-8",
-        )
+        self.sample_rate = sample_rate
         try:
-            self.mediamtx_process = subprocess.Popen(
-                [str(self.mediamtx), str(media_config)],
-                cwd=self.mediamtx.parent,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                creationflags=WINDOW_CREATION_FLAGS,
-            )
-            self.state.update_component("mediamtx", "running", pid=self.mediamtx_process.pid, message=f"WebRTC :{webrtc_port}/{webrtc_media_port}; HLS :{hls_port}")
-            self._pump_errors(self.mediamtx_process, "MediaMTX")
-            time.sleep(0.4)
-            if self.mediamtx_process.poll() is not None:
-                raise RuntimeError("MediaMTX exited during startup")
+            if self.server is not None:
+                self.mediamtx_process = self.server.ensure()
+                self.state.update_component("mediamtx", "running", pid=self.mediamtx_process.pid, message="Shared media server ready")
+            else:
+                media_config = self.paths.state / "mediamtx.generated.yml"
+                advertised_hosts = local_ipv4_addresses()
+                public_host = urlparse(str(self.settings.section("server").get("public_url") or "")).hostname
+                if public_host and public_host not in advertised_hosts:
+                    advertised_hosts.append(public_host)
+                hosts = "\n".join(f"  - {address}" for address in advertised_hosts)
+                media_config.write_text(
+                    "\n".join(
+                        [
+                            "logLevel: warn",
+                            f"rtspAddress: :{rtsp_port}",
+                            f"webrtcAddress: :{webrtc_port}",
+                            f"webrtcLocalUDPAddress: :{webrtc_media_port}",
+                            f"webrtcLocalTCPAddress: :{webrtc_media_port}",
+                            "hls: yes",
+                            f"hlsAddress: 127.0.0.1:{hls_port}",
+                            "hlsAlwaysRemux: yes",
+                            "hlsVariant: lowLatency",
+                            "hlsSegmentCount: 7",
+                            "hlsSegmentDuration: 1s",
+                            "hlsPartDuration: 200ms",
+                            "rtmp: no",
+                            "api: no",
+                            "metrics: no",
+                            "pprof: no",
+                            "webrtcAdditionalHosts:",
+                            hosts,
+                            "paths:",
+                            f"  {stream_name}: {{}}",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+                self.mediamtx_process = subprocess.Popen(
+                    [str(self.mediamtx), str(media_config)],
+                    cwd=self.mediamtx.parent,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    creationflags=WINDOW_CREATION_FLAGS,
+                )
+                self.state.update_component("mediamtx", "running", pid=self.mediamtx_process.pid, message=f"WebRTC :{webrtc_port}/{webrtc_media_port}; HLS :{hls_port}")
+                self._pump_errors(self.mediamtx_process, "MediaMTX")
+                time.sleep(0.4)
+                if self.mediamtx_process.poll() is not None:
+                    raise RuntimeError("MediaMTX exited during startup")
+
             command = [
                 str(self.ffmpeg), "-hide_banner", "-loglevel", "error", "-fflags", "nobuffer",
                 "-f", "s16le", "-ar", str(sample_rate), "-ac", "1", "-i", "pipe:0",
@@ -145,7 +158,7 @@ class StreamingManager:
             )
             self.state.update_component("ffmpeg", "running", pid=self.ffmpeg_process.pid, message="Publishing Opus audio")
             self._pump_errors(self.ffmpeg_process, "FFmpeg stream")
-            self._writer = threading.Thread(target=self._write_loop, name="stream-writer", daemon=True)
+            self._writer = threading.Thread(target=self._write_loop, args=(self._queue, self.ffmpeg_process), name="stream-writer", daemon=True)
             self._writer.start()
             self.events.publish("stream", {"state": "live"})
             return True
@@ -156,6 +169,12 @@ class StreamingManager:
             return False
 
     def write(self, data: bytes) -> None:
+        if self.on_pcm:
+            try:
+                self.on_pcm(data, self.sample_rate)
+            except Exception:
+                # Optional listening must never interrupt the recording callback.
+                self.logger.exception("Mix input failed")
         process = self.ffmpeg_process
         if process is None or process.poll() is not None:
             return
@@ -168,13 +187,11 @@ class StreamingManager:
             except (queue.Empty, queue.Full):
                 pass
 
-    def _write_loop(self) -> None:
+    def _write_loop(self, pending, process) -> None:
         while True:
-            data = self._queue.get()
+            data = pending.get()
             if data is None:
                 break
-            with self._lock:
-                process = self.ffmpeg_process
             if process is None or process.stdin is None or process.poll() is not None:
                 self.state.update_component("ffmpeg", "fault", message="Streaming publisher stopped")
                 break
@@ -203,7 +220,10 @@ class StreamingManager:
             self.ffmpeg_process = None
             self.mediamtx_process = None
         terminate_process(ffmpeg)
-        terminate_process(mediamtx)
+        if self._writer and self._writer is not threading.current_thread():
+            self._writer.join(timeout=3)
+        if self.server is None:
+            terminate_process(mediamtx)
         self.state.update_component("ffmpeg", "stopped", message="Publisher stopped")
         self.state.update_component("mediamtx", "stopped", message="Media server stopped")
 

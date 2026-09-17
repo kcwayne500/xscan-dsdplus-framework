@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, AsyncIterator
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from cryptography.exceptions import InvalidSignature
@@ -26,6 +26,9 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
+from .feeds import FeedManager, selected_feed
+from .multimedia import stream_names
+from fastapi.routing import APIRoute
 from .auth import AuthManager, RateLimited
 from .audio import AudioEngine
 from .config_manager import ConfigManager, ConfigValidationError, RevisionConflict
@@ -48,33 +51,22 @@ CSRF_COOKIE = "xscan_csrf"
 class AppContext:
     def __init__(self, paths: AppPaths, verbose: bool = False):
         paths.ensure()
-        self.paths = paths
+        self.root_paths = paths
         self.logger = configure_logging(paths, verbose)
-        self.settings = SettingsStore(paths)
-        self.events = EventBus()
-        self.database = Database(paths)
-        self.state = RuntimeState(paths, self.events)
-        self.config = ConfigManager(paths)
-        self.auth = AuthManager(paths, self.database)
-        self.streaming = StreamingManager(paths, self.settings, self.state, self.events, self.logger)
-        self.supervisor = ProcessSupervisor(paths, self.settings, self.state, self.events, self.logger)
-        self.audio = AudioEngine(paths, self.settings, self.database, self.state, self.events, self.streaming, self.logger)
-        self.runtime = HostRuntime(
-            self.settings, self.state, self.events, self.supervisor, self.audio, self.streaming, self.logger
-        )
-        self.migrator = Migrator(paths, self.settings, self.database, self.logger)
-        self.whep_sessions: dict[str, str] = {}
+        self.root_settings = SettingsStore(paths)
+        self.feeds = FeedManager(paths, self.root_settings, self.logger)
+        self.auth = AuthManager(paths, self.feeds.get("feed1").database)
+        self.whep_sessions = {}
         self.whep_lock = threading.Lock()
 
-    def initialise(self) -> None:
-        result = self.migrator.run()
-        recovered = self.audio.recover_partials()
-        self.logger.info("Migration complete: %s; recovered=%s", result, recovered)
-        self.state.update_component("web", "running", message="API is serving")
-        self.runtime.auto_start()
+    def __getattr__(self, name):
+        return getattr(self.feeds.get(selected_feed.get()), name)
 
-    def close(self) -> None:
-        self.runtime.close()
+    def initialise(self):
+        self.feeds.initialise()
+
+    def close(self):
+        self.feeds.close()
 
 
 def _is_local(request: Request) -> bool:
@@ -112,7 +104,7 @@ def create_app(paths: AppPaths | None = None, verbose: bool = False) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
-        context.events.bind_loop()
+        context.feeds.bind_loop()
         await asyncio.to_thread(context.initialise)
         yield
         await asyncio.to_thread(context.close)
@@ -163,6 +155,10 @@ def create_app(paths: AppPaths | None = None, verbose: bool = False) -> FastAPI:
     @app.exception_handler(RevisionConflict)
     async def revision_conflict_handler(_request: Request, exc: RevisionConflict):
         return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(ValueError)
+    async def invalid_input(_request, exc):
+        return JSONResponse(status_code=422, content={"detail": str(exc)})
 
     @app.exception_handler(ConfigValidationError)
     async def validation_handler(_request: Request, exc: ConfigValidationError):
@@ -256,6 +252,8 @@ def create_app(paths: AppPaths | None = None, verbose: bool = False) -> FastAPI:
             request and (_is_local(request) or client_address in set(local_ipv4_addresses()))
         )
         return {
+            "feed_id": selected_feed.get(),
+            "name": context.root_settings.section("feeds")[selected_feed.get()]["name"],
             "running": bool(snapshot.get("running")),
             "recording": bool(snapshot.get("recording")),
             "audio_level": float(snapshot.get("audio_level") or 0),
@@ -271,7 +269,9 @@ def create_app(paths: AppPaths | None = None, verbose: bool = False) -> FastAPI:
     def m2_call_payload(item: dict[str, Any]) -> dict[str, Any]:
         audio_name = Path(str(item.get("audio_file") or "")).name
         playable = bool(audio_name and (context.paths.recordings / audio_name).is_file())
+        prefix = "/api/m2" if selected_feed.get() == "feed1" else f"/api/m2/feeds/{selected_feed.get()}"
         return {
+            "feed_id": selected_feed.get(),
             "id": str(item.get("id") or ""),
             "started_at": item.get("started_at"),
             "duration_seconds": item.get("duration_seconds"),
@@ -281,7 +281,7 @@ def create_app(paths: AppPaths | None = None, verbose: bool = False) -> FastAPI:
             "radio_alias": str(item.get("radio_alias") or ""),
             "talkgroup_alias": str(item.get("talkgroup_alias") or ""),
             "playable": playable,
-            "audio_url": f"/api/m2/calls/{item.get('id')}/audio" if playable else "",
+            "audio_url": f"{prefix}/calls/{item.get('id')}/audio" if playable else "",
         }
 
     @app.get("/api/m2/status")
@@ -298,12 +298,14 @@ def create_app(paths: AppPaths | None = None, verbose: bool = False) -> FastAPI:
 
     @app.get("/api/m2/events")
     async def m2_events(request: Request):
-        queue = context.events.subscribe()
+        event_bus = context.events
+        initial = m2_status_payload(request)
+        queue = event_bus.subscribe()
         allowed = {"audio-level", "now-playing", "recording", "call-completed", "component", "stream", "system"}
 
         async def stream() -> AsyncIterator[str]:
             try:
-                yield f"event: snapshot\ndata: {json.dumps(m2_status_payload(request), default=str)}\n\n"
+                yield f"event: snapshot\ndata: {json.dumps(initial, default=str)}\n\n"
                 while not await request.is_disconnected():
                     try:
                         event = await asyncio.wait_for(queue.get(), timeout=15)
@@ -312,7 +314,7 @@ def create_app(paths: AppPaths | None = None, verbose: bool = False) -> FastAPI:
                     except asyncio.TimeoutError:
                         yield ": heartbeat\n\n"
             finally:
-                context.events.unsubscribe(queue)
+                event_bus.unsubscribe(queue)
 
         return StreamingResponse(
             stream(),
@@ -648,19 +650,21 @@ def create_app(paths: AppPaths | None = None, verbose: bool = False) -> FastAPI:
 
     @app.get("/api/v1/events")
     async def events(request: Request, _session=Depends(require_event_auth)):
-        queue = context.events.subscribe()
+        event_bus = context.events
+        initial = context.state.snapshot()
+        queue = event_bus.subscribe()
 
         async def stream() -> AsyncIterator[str]:
             try:
-                yield f"event: snapshot\ndata: {json.dumps(context.state.snapshot(), default=str)}\n\n"
+                yield f"event: snapshot\ndata: {json.dumps(initial, default=str)}\n\n"
                 while not await request.is_disconnected():
                     try:
                         event = await asyncio.wait_for(queue.get(), timeout=15)
-                        yield f"event: {event.type}\ndata: {json.dumps(context.events.serialise(event), default=str)}\n\n"
+                        yield f"event: {event.type}\ndata: {json.dumps(event_bus.serialise(event), default=str)}\n\n"
                     except asyncio.TimeoutError:
                         yield ": heartbeat\n\n"
             finally:
-                context.events.unsubscribe(queue)
+                event_bus.unsubscribe(queue)
 
         return StreamingResponse(stream(), media_type="text/event-stream", headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
@@ -685,30 +689,38 @@ def create_app(paths: AppPaths | None = None, verbose: bool = False) -> FastAPI:
         headers = {"Cache-Control": "no-store", "Access-Control-Allow-Origin": "*"}
         return Response(content=upstream.content, media_type=content_type, headers=headers)
 
-    def whep_base() -> str:
+    def whep_base(source=None) -> str:
         stream = context.settings.section("streaming")
+        if source == "both":
+            stream["stream_name"] = stream_names(context.root_settings)["both"]
         return f"http://127.0.0.1:{stream['webrtc_port']}/{stream['stream_name']}/whep"
 
-    async def whep_create_response(request: Request, public_prefix: str) -> Response:
+    async def whep_create_response(request: Request, public_prefix: str, source=None) -> Response:
+        public_prefix = request.url.path
         body = await request.body()
         async with httpx.AsyncClient(timeout=15) as client:
             try:
-                upstream = await client.post(whep_base(), content=body, headers={"Content-Type": request.headers.get("content-type", "application/sdp")})
+                upstream = await client.post(whep_base(source), content=body, headers={"Content-Type": request.headers.get("content-type", "application/sdp")})
             except httpx.HTTPError as exc:
                 raise HTTPException(502, f"WebRTC publisher unavailable: {exc}") from exc
         headers = {"Content-Type": upstream.headers.get("content-type", "application/sdp"), "Cache-Control": "no-store"}
         location = upstream.headers.get("location")
         if location:
-            target = urljoin(whep_base(), location)
+            target = urljoin(whep_base(source), location)
+            base = urlparse(whep_base(source))
+            parsed = urlparse(target)
+            if (parsed.scheme, parsed.netloc) != (base.scheme, base.netloc) or not parsed.path.startswith(base.path.rsplit("/", 1)[0] + "/"):
+                raise HTTPException(502, "Invalid media server session location")
             token = os.urandom(16).hex()
             with context.whep_lock:
-                context.whep_sessions[token] = target
+                context.whep_sessions[token] = (source or selected_feed.get(), target)
             headers["Location"] = f"{public_prefix}/{token}"
         return Response(content=upstream.content, status_code=upstream.status_code, headers=headers)
 
-    async def whep_session_response(token: str, request: Request) -> Response:
+    async def whep_session_response(token: str, request: Request, source=None) -> Response:
         with context.whep_lock:
-            target = context.whep_sessions.get(token)
+            entry = context.whep_sessions.get(token)
+        target = entry[1] if entry and entry[0] == (source or selected_feed.get()) else None
         if not target:
             if request.method == "DELETE":
                 return Response(status_code=204)
@@ -746,6 +758,75 @@ def create_app(paths: AppPaths | None = None, verbose: bool = False) -> FastAPI:
     @app.api_route("/api/m2/whep/{token}", methods=["PATCH", "DELETE"])
     async def m2_whep_session(token: str, request: Request):
         return await whep_session_response(token, request)
+
+    @app.get("/api/v1/feeds")
+    def feeds_index(_session=Depends(require_session)):
+        return {"items": [context.feeds.summary(key) for key in ("feed1", "feed2")],
+                "mix": context.root_settings.section("mix"),
+                "mix_health": {"drops": dict(context.feeds.mixer.drops),
+                    "restarts": context.feeds.mixer.restarts, "last_error": context.feeds.mixer.last_error}}
+
+    @app.patch("/api/v1/feeds/{feed_id}")
+    def configure_feed(feed_id: str, payload: dict = Body(...), _session=Depends(require_csrf)):
+        if feed_id not in context.feeds.feeds:
+            raise HTTPException(404, "Unknown feed")
+        return context.feeds.configure(feed_id, payload)
+
+    @app.post("/api/v1/feeds/feed2/provision")
+    def provision_feed(_session=Depends(require_csrf)):
+        return context.feeds.provision()
+
+    @app.put("/api/v1/mix")
+    def configure_mix(payload: dict = Body(...), _session=Depends(require_csrf)):
+        if set(payload) != {"feed1", "feed2"}:
+            raise HTTPException(422, "Provide both mix weights")
+        context.root_settings.update({"mix": payload})
+        return context.root_settings.section("mix")
+
+    @app.get("/api/m2/feeds")
+    def listener_feeds(request: Request):
+        items = []
+        for key in ("feed1", "feed2"):
+            token = selected_feed.set(key)
+            try:
+                items.append({"id": key, **context.root_settings.section("feeds")[key],
+                              "status": m2_status_payload(request)})
+            finally:
+                selected_feed.reset(token)
+        return {"items": items, "both_ready": all(context.feeds.mix_stream.health().values())}
+
+    @app.post("/api/m2/mix/whep")
+    async def mix_whep(request: Request):
+        if not context.root_settings.section("feeds")["feed2"]["enabled"]:
+            raise HTTPException(409, "Both requires Feed 2 to be enabled")
+        return await whep_create_response(request, "/api/m2/mix/whep", source="both")
+
+    @app.api_route("/api/m2/mix/whep/{token}", methods=["PATCH", "DELETE"])
+    async def mix_whep_session(token: str, request: Request):
+        return await whep_session_response(token, request, source="both")
+
+    async def select_feed(feed_id: str):
+        if feed_id not in context.feeds.feeds:
+            raise HTTPException(404, "Unknown feed")
+        token = selected_feed.set(feed_id)
+        try:
+            yield
+        finally:
+            selected_feed.reset(token)
+
+    # Reuse endpoint implementations AND their original authentication dependencies.
+    # Request-local context prevents concurrent requests from switching another client.
+    resources = ("status", "system", "calls", "devices", "settings", "config", "diagnostics", "events", "stream")
+    for route in list(app.routes):
+        if not isinstance(route, APIRoute):
+            continue
+        for base, allowed in (("/api/v1/", resources), ("/api/m2/", ("status", "calls", "events", "whep"))):
+            if route.path.startswith(base):
+                suffix = route.path[len(base):]
+                if suffix.split("/")[0] in allowed:
+                    app.add_api_route(base + "feeds/{feed_id}/" + suffix, route.endpoint,
+                        methods=route.methods, dependencies=[Depends(select_feed)],
+                        name="feed_" + route.name)
 
     if not context.paths.web.is_dir():
         @app.get("/")

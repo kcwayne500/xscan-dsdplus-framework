@@ -45,6 +45,15 @@ def _uninitialise_windows_com(initialised: bool) -> None:
         ctypes.windll.ole32.CoUninitialize()
 
 
+def select_capture_channel(data: bytes, channel: str) -> bytes:
+    """Demultiplex interleaved PCM16, never downmix the other receiver."""
+    if channel == "mono":
+        return data
+    if channel not in ("left", "right") or len(data) % 4:
+        raise ValueError("Invalid stereo PCM or capture channel")
+    return np.frombuffer(data, dtype="<i2").reshape(-1, 2)[:, 0 if channel == "left" else 1].tobytes()
+
+
 @dataclass(slots=True)
 class TriggerEvent:
     type: str
@@ -123,11 +132,14 @@ class AudioEngine:
         self._default_threshold = 0.0021
         self._default_silence_hang = 1.0
         self.sample_rate = 0
+        self._capture_channel = "mono"
         tools = settings.section("tools")
         self.ffmpeg = _find_tool(paths, "ffmpeg", "ffmpeg.exe", str(tools.get("ffmpeg") or ""))
 
     def is_healthy(self) -> bool:
         if not self._running.is_set() or self.stream is None:
+            return False
+        if self._processor is None or not self._processor.is_alive():
             return False
         try:
             return bool(self.stream.active)
@@ -159,6 +171,9 @@ class AudioEngine:
         preferred_host_api = str(config.get("device_host_api") or "Windows WASAPI").casefold()
         devices = self.devices()
         matches = [device for device in devices if device["name"].casefold() == preferred]
+        if config.get("strict_device", False) or config.get("capture_channel", "mono") != "mono":
+            strict = [device for device in matches if device["host_api"].casefold() == preferred_host_api]
+            return strict[0] if len(strict) == 1 else None
         exact = (
             next((device for device in matches if device["host_api"].casefold() == preferred_host_api), None)
             or next((device for device in matches if device["host_api"].casefold() == "windows wasapi"), None)
@@ -167,6 +182,8 @@ class AudioEngine:
         )
         if exact:
             return exact
+        if config.get("strict_device", False):
+            return None
         # Driver revisions can change a VB-Cable descriptive suffix (for
         # example "Virtual Cable" to "Point") and its PortAudio host API.
         # Match the endpoint's stable words instead of a numeric device index.
@@ -203,6 +220,10 @@ class AudioEngine:
                 self.state.update_component("audio", "fault", message="Configured audio device is unavailable")
                 return False
             config = self.settings.section("audio")
+            self._capture_channel = config.get("capture_channel", "mono")
+            capture_channels = 1 if self._capture_channel == "mono" else 2
+            if int(device["input_channels"]) < capture_channels:
+                raise ValueError("Configured endpoint does not support stereo capture; refusing mono fallback")
             self._queue = queue.Queue(maxsize=256)
             self._channel_overrides = dict(config.get("per_channel") or {})
             self._default_threshold = float(config["trigger_level"])
@@ -217,8 +238,9 @@ class AudioEngine:
                 samplerate=sample_rate,
                 blocksize=int(config["blocksize"]),
                 device=int(device["index"]),
-                channels=1,
+                channels=capture_channels,
                 dtype="int16",
+                extra_settings=sd.WasapiSettings(exclusive=False) if device["host_api"] == "Windows WASAPI" else None,
                 callback=self._callback,
             )
             self._running.set()
@@ -226,11 +248,17 @@ class AudioEngine:
             self._processor = threading.Thread(target=self._process_loop, args=(sample_rate, device["name"]), name="audio-processor", daemon=True)
             self._processor.start()
             self.streaming.start(sample_rate)
-            self.state.update_component("audio", "running", message=f"{device['name']} @ {sample_rate} Hz")
+            self.state.update_component("audio", "running", message=f"{device['name']} / {self._capture_channel} @ {sample_rate} Hz")
             self.state.update_component("recorder", "ready", message="Waiting for audio")
             return True
         except Exception as exc:
             self._running.clear()
+            if self.stream:
+                try:
+                    self.stream.close()
+                except Exception:
+                    pass
+                self.stream = None
             self.state.update_component("audio", "fault", message=str(exc))
             self.logger.exception("Audio capture failed to start")
             return False
@@ -250,6 +278,11 @@ class AudioEngine:
             except Exception:
                 pass
             self.stream = None
+        if self._processor and self._processor is not threading.current_thread():
+            self._processor.join(timeout=5)
+            if self._processor.is_alive():
+                raise RuntimeError("Recorder has not stopped; refusing to reuse its capture queue")
+        self._processor = None
         self.streaming.stop()
         self.state.update_component("audio", "stopped", message="Audio capture stopped")
         self.state.update_component("recorder", "stopped", message="Recorder stopped")
@@ -257,9 +290,11 @@ class AudioEngine:
     def close(self) -> None:
         self.stop()
         self._conversion_queue.put(None)
+        self._converter.join(timeout=30)
 
     def _callback(self, indata, frames, time_info, status) -> None:
-        data = bytes(indata)
+        # Both the recording queue and live publisher receive ONLY this feed.
+        data = select_capture_channel(bytes(indata), self._capture_channel)
         if status:
             self.logger.warning("Audio callback status: %s", status)
         try:

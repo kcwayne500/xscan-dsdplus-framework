@@ -151,6 +151,12 @@ Get-ItemPropertyValue `
 
 ## Updating XScan
 
+For the dual-feed candidate, use [DUAL_FEEDS.md](DUAL_FEEDS.md) and
+`scripts/upgrade-dual-feed.ps1`. The candidate is not installed by a source edit.
+The fresh-install script now refuses existing installations; the setup commands
+below are for initial installation, not an in-place dual-feed upgrade. Preserve
+the existing logon launcher and validate Feed 1 before enabling Feed 2.
+
 Before updating, inspect `git status` and preserve unrelated local changes.
 Compare local `main` with `origin/main`; do not replace the installed host from
 the older recorder checkout. For a cutover reinstall on this machine, use the

@@ -12,7 +12,7 @@
   <link rel="manifest" href="/m2/manifest.webmanifest">
   <link rel="icon" href="/icons/xscan-192.png">
   <link rel="stylesheet" href="/m2/m2.css">
-  <link rel="stylesheet" href="/m2/compact.css?v=7">
+  <link rel="stylesheet" href="/m2/compact.css?v=8">
   <title>XScan M2</title>
 </head>
 <body>
@@ -23,6 +23,8 @@
       <div id="connectionPill" class="status-pill offline"><i></i><span>OFFLINE</span></div>
     </header>
 
+    <nav class="feed-picker" aria-label="Live feed"><button type="button" data-listen-feed="feed1">Feed 1</button><button type="button" data-listen-feed="feed2">Feed 2</button><button type="button" data-listen-feed="both">Both</button></nav>
+    <div id="bothStatus" class="panel" hidden aria-live="polite"></div>
     <section id="lcd" class="lcd-panel offline" aria-live="polite">
       <div class="lcd-topline"><span id="lcdMode">FM</span><span id="lcdState">STANDBY</span><span id="lcdClock">--:--:--</span></div>
       <div id="lcdFrequency" class="lcd-frequency">---.----</div>
@@ -56,6 +58,7 @@
     </section>
 
     <section id="callsPanel" class="tab-panel" hidden>
+      <label class="history-feed-label">Recording history <select id="historyFeed"><option value="feed1">Feed 1</option><option value="feed2">Feed 2</option></select></label>
       <article class="panel tape-panel">
         <div class="panel-heading"><div><span class="micro-label">REWIND TIMELINE</span><h1>One notch per stored call</h1></div><button id="jumpLiveButton" class="live-chip" type="button">RETURN LIVE</button></div>
         <div class="duration-key"><span class="short">SHORT</span><span class="medium">MEDIUM</span><span class="long">LONG</span><span class="very-long">VERY LONG</span></div>
@@ -74,6 +77,6 @@
   </main>
 
   <audio id="audio" preload="none" playsinline></audio>
-  <script src="/m2/m2.js?v=7" defer></script>
+  <script src="/m2/m2.js?v=8" defer></script>
 </body>
 </html>

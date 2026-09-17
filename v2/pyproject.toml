@@ -16,6 +16,7 @@ dependencies = [
   "Pillow>=10,<12",
   "psutil>=6,<8",
   "pystray>=0.19,<1",
+  "pycaw==20251023; sys_platform == 'win32'",
   "sounddevice>=0.5,<1",
   "uvicorn>=0.34,<1",
 ]

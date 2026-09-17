@@ -97,8 +97,10 @@ class HostRuntime:
     def close(self) -> None:
         self._closing.set()
         with self._lock:
-            self.audio.close()
-            self.supervisor.close()
+            try:
+                self.audio.close()
+            finally:
+                self.supervisor.close()
         self._monitor_thread.join(timeout=3)
 
     def _schedule_recovery(self, name: str, message: str) -> bool:

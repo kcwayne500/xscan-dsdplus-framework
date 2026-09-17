@@ -1,4 +1,4 @@
-import { cookie } from './api.js';
+import { cookie, feedPath, request } from './api.js?v=11';
 
 function csrfHeaders(extra = {}) { return { ...extra, 'X-CSRF-Token': cookie('xscan_csrf') }; }
 
@@ -87,7 +87,8 @@ export class Player {
     read(); this.nativeTimer = setInterval(read, 800);
   }
   async liveHls(autoplay = true) {
-    const path='/api/v1/stream/hls/scanner/index.m3u8';
+    const settings = await request('/api/v1/settings');
+    const path=feedPath(`/api/v1/stream/hls/${settings.streaming.stream_name}/index.m3u8`);
     this.audio.srcObject=null;
     if (window.Hls?.isSupported()) {
       const hls=new window.Hls({lowLatencyMode:true,liveSyncDurationCount:2,maxLiveSyncPlaybackRate:1.5,backBufferLength:0,xhrSetup:xhr=>{xhr.withCredentials=true;}}); this.hls=hls;
@@ -107,7 +108,7 @@ export class Player {
     pc.onconnectionstatechange = () => this.emit(pc.connectionState);
     await pc.setLocalDescription(await pc.createOffer());
     await waitForIce(pc);
-    const response = await fetch('/api/v1/stream/whep', {
+    const response = await fetch(feedPath('/api/v1/stream/whep'), {
       method: 'POST', credentials: 'same-origin', headers: csrfHeaders({ 'Content-Type': 'application/sdp' }), body: pc.localDescription.sdp,
     });
     if (!response.ok) throw new Error(await response.text() || 'Live stream unavailable');
@@ -119,7 +120,7 @@ export class Player {
     await this.close();
     this.mode = 'replay'; this.label = call.label || call.frequency || 'Recorded call';
     this.setMediaSession();
-    this.audio.srcObject = null; this.audio.src = `/api/v1/calls/${call.id}/audio`; this.audio.load();
+    this.audio.srcObject = null; this.audio.src = feedPath(`/api/v1/calls/${call.id}/audio`); this.audio.load();
     try { await this.audio.play(); } catch { this.emit('ready'); }
   }
   async toggle() {

@@ -1,5 +1,5 @@
-const CACHE = 'xscan-m2-shell-7';
-const SHELL = ['/m2/', '/m2/index.html', '/m2/m2.css', '/m2/compact.css?v=7', '/m2/m2.js?v=7', '/m2/manifest.webmanifest', '/icons/xscan-192.png', '/icons/xscan-maskable-192.png', '/icons/xscan-512.png'];
+const CACHE = 'xscan-m2-shell-8';
+const SHELL = ['/m2/', '/m2/index.html', '/m2/m2.css', '/m2/compact.css?v=8', '/m2/m2.js?v=8', '/m2/manifest.webmanifest', '/icons/xscan-192.png', '/icons/xscan-maskable-192.png', '/icons/xscan-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(async cache => {

@@ -12,10 +12,20 @@ def test_login_page_does_not_poll_protected_status_or_reload():
 
 def test_service_worker_uses_network_first_and_current_cache():
     source = (WEB / "sw.js").read_text(encoding="utf-8")
-    assert "xscan-v2-shell-8" in source
+    assert "xscan-v2-shell-11" in source
+    assert "'/feeds.js?v=11'" in source
     assert "fetch(event.request).then" in source
     assert "self.skipWaiting()" in source
     assert "url.pathname.startsWith('/api/')" in source
+
+
+def test_module_graph_is_versioned_together_for_existing_browser_caches():
+    assert '/app.js?v=11' in (WEB / 'index.html').read_text(encoding='utf-8')
+    for module in ('app.js', 'feeds.js', 'player.js'):
+        source = (WEB / module).read_text(encoding='utf-8')
+        assert "from './api.js?v=11'" in source
+    app = (WEB / 'app.js').read_text(encoding='utf-8')
+    assert "from './feeds.js?v=11'" in app and "from './player.js?v=11'" in app
 
 
 def test_dashboard_distinguishes_scanner_controls_from_browser_audio():
@@ -100,7 +110,9 @@ def test_m2_is_a_standalone_public_webrtc_pwa_with_call_tape():
     worker = (m2 / "sw.js").read_text(encoding="utf-8")
     manifest = json.loads((m2 / "manifest.webmanifest").read_text(encoding="utf-8"))
     assert manifest["id"] == "/m2/" and manifest["display"] == "standalone"
-    assert "RTCPeerConnection" in script and "fetch('/api/m2/whep'" in script
+    assert "RTCPeerConnection" in script and "'/api/m2/mix/whep'" in script
+    assert "feedUrl(listeningFeed, 'whep')" in script
+    assert 'data-listen-feed="both"' in index and 'id="historyFeed"' in index
     assert "Hls" not in script and "/api/v1/mobile/token" not in script
     assert "navigator.mediaSession" in script and "setActionHandler" in script
     assert 'id="callTape"' in index and 'class="call-tape sequence-tape"' in index
@@ -109,7 +121,7 @@ def test_m2_is_a_standalone_public_webrtc_pwa_with_call_tape():
     assert "PixelSplitter-Bold.ttf" not in styles and 'id="audioMeter"' in index
     assert "url.pathname.startsWith('/api/')" in worker
     assert "hostPlaybackBlocked" in script and "prevent VB-CABLE feedback" in script
-    assert "xscan-m2-shell-7" in worker
+    assert "xscan-m2-shell-8" in worker
     assert ".lcd-panel.recording" in compact and "#e36b76" in compact
     assert ".lcd-panel.replay" in compact and "#aaa1e3" in compact
     assert ".call-notch.selected" in compact and ".recent-call.selected" in compact

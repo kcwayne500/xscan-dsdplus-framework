@@ -15,7 +15,8 @@ class Event:
 
 
 class EventBus:
-    def __init__(self) -> None:
+    def __init__(self, feed_id: str = "feed1") -> None:
+        self.feed_id = feed_id
         self._subscribers: set[asyncio.Queue[Event]] = set()
         self._lock = threading.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -24,7 +25,7 @@ class EventBus:
         self._loop = loop or asyncio.get_running_loop()
 
     def publish(self, event_type: str, data: dict[str, Any]) -> None:
-        event = Event(event_type, data, datetime.now(UTC).isoformat())
+        event = Event(event_type, {**data, "feed_id": self.feed_id}, datetime.now(UTC).isoformat())
         loop = self._loop
         if loop and loop.is_running():
             loop.call_soon_threadsafe(self._deliver, event)

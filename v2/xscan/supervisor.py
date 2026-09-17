@@ -13,6 +13,7 @@ from .events import EventBus
 from .parsers import parse_dsd_event, parse_fmp_line
 from .paths import AppPaths
 from .settings import SettingsStore
+from .session_audio import route_decoder_audio
 from .state import RuntimeState
 from .windows import WINDOW_CREATION_FLAGS, external_program_dll_search, set_process_windows_visible, terminate_process
 
@@ -26,7 +27,7 @@ _DSD_MONITOR_ARGUMENT = re.compile(r"-m[0-4]", re.IGNORECASE)
 
 
 def _dsd_command_args(arguments: list[str]) -> list[str]:
-    """Force the mixed analog/digital source-monitor mode on every launch."""
+    """Legacy monitor flag; recent DSDPlus uses its saved Input menu setting."""
     normalized = [str(value) for value in arguments if not _DSD_MONITOR_ARGUMENT.fullmatch(str(value))]
     insert_at = 1 if normalized and normalized[0].lower().startswith("-r") else 0
     normalized.insert(insert_at, "-m2")
@@ -80,7 +81,13 @@ class ProcessSupervisor:
         self.state.desired_running = True
         if persist:
             self.settings.update({"runtime": {"desired_running": True}})
-        self._start_pair()
+        try:
+            self._start_pair()
+        except Exception:
+            self._desired = False
+            self.state.desired_running = False
+            self._stop_pair()
+            raise
 
     def stop(self, persist: bool = True) -> None:
         self._desired = False
@@ -126,6 +133,14 @@ class ProcessSupervisor:
             if runtime["hide_native_windows"]:
                 threading.Timer(1.0, set_process_windows_visible, args=(self.dsd_process.pid, False)).start()
             time.sleep(1.0)
+            lane = self.settings.section("audio").get("capture_channel", "mono")
+            try:
+                devices = route_decoder_audio(self.dsd_process, lane)
+            except Exception:
+                self._stop_pair_locked()
+                raise
+            if devices:
+                self.logger.info("Verified decoder session routed %s on %s", lane, devices)
             self.logger.info("Starting FMP24: %s", runtime["fmp24_args"])
             with external_program_dll_search():
                 self.fmp_process = subprocess.Popen(
@@ -166,6 +181,18 @@ class ProcessSupervisor:
                 dsd_code = self.dsd_process.poll() if self.dsd_process else None
                 fmp_code = self.fmp_process.poll() if self.fmp_process else None
             if alive:
+                try:
+                    with self._lock:
+                        if not self._desired or not self._pair_alive():
+                            continue
+                        route_decoder_audio(self.dsd_process,
+                            self.settings.section("audio").get("capture_channel", "mono"), apply=False)
+                except Exception as exc:
+                    self.state.last_error = str(exc)
+                    self.logger.error("Audio isolation lost; stopping receiver: %s", exc)
+                    self.stop()
+                    self.state.update_component("dsdplus", "fault", message=str(exc))
+                    continue
                 self.state.heartbeat("dsdplus")
                 self.state.heartbeat("fmp24")
                 continue
@@ -232,10 +259,16 @@ class ProcessSupervisor:
             self.logger.warning("Compatibility log write failed: %s", exc)
 
     def _tail_dsd_events(self) -> None:
-        path = self.paths.dsdplus / "1R-DSDPlus.event"
+        path = None
         position = 0
         identity: tuple[int, int] | None = None
         while not self._closing.wait(0.5):
+            modifier = next((arg[2:] for arg in self.settings.section("runtime")["dsdplus_args"]
+                             if re.fullmatch(r"-F\d+", arg)), "0")
+            suffix = f"#{modifier}" if modifier != "0" else ""
+            current_path = self.paths.dsdplus / f"1R-DSDPlus{suffix}.event"
+            if current_path != path:
+                path, position, identity = current_path, 0, None
             try:
                 stat = path.stat()
                 current_identity = (stat.st_dev, stat.st_ino)

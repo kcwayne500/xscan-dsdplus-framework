@@ -6,6 +6,10 @@ const state = {
   playIntent: false, recoveryPending: false, lastRecoveryAt: 0,
   connectionGeneration: 0, activeConnect: 0, connectStartedAt: 0
 };
+let listeningFeed = localStorage.getItem('xscan-m2-feed') || 'feed1';
+if (!['feed1','feed2','both'].includes(listeningFeed)) listeningFeed = 'feed1';
+let historyFeed = localStorage.getItem('xscan-m2-history-feed') === 'feed2' ? 'feed2' : 'feed1';
+const feedUrl = (id, resource) => `/api/m2/feeds/${id}/${resource}`;
 const audio = $('audio');
 const meter = $('audioMeter');
 const meterSegments = Array.from({length: 24}, (_, index) => {
@@ -146,10 +150,34 @@ function applyStatus(status) {
 }
 
 async function loadStatus() {
+  const selection = listeningFeed;
   try {
-    const response = await fetch('/api/m2/status', {cache:'no-store'});
-    if (!response.ok) throw new Error(`status ${response.status}`);
-    applyStatus(await response.json());
+    const inventory = await fetch('/api/m2/feeds', {cache:'no-store'}).then(r => { if(!r.ok) throw Error(); return r.json(); });
+    if (selection !== listeningFeed) return;
+    const enabled = inventory.items.filter(item => item.enabled);
+    document.querySelectorAll('[data-listen-feed]').forEach(button => {
+      const item = inventory.items.find(item => item.id === button.dataset.listenFeed);
+      button.disabled = item ? !item.enabled : enabled.length < 2;
+      button.setAttribute('aria-pressed', String(button.dataset.listenFeed === selection));
+      if (item) button.textContent = item.name;
+    });
+    for (const option of $('historyFeed').options) {
+      option.textContent = inventory.items.find(item => item.id === option.value)?.name || option.value;
+    }
+    $('historyFeed').value = historyFeed;
+    const primary = inventory.items.find(item => item.id === (selection === 'both' ? 'feed1' : selection));
+    const status = {...primary.status};
+    $('bothStatus').hidden = selection !== 'both';
+    if (selection === 'both') {
+      $('bothStatus').innerHTML = inventory.items.map(item => `<div><strong>${escapeHtml(item.name)}</strong> <span>${escapeHtml(item.status.now_playing?.display || 'No channel')} · ${item.status.running ? 'Scanning' : 'Unavailable'}</span></div>`).join('');
+      status.now_playing = {frequency:'BOTH', label:'Both scanner feeds', mode:'MIX'};
+      status.stream_ready = inventory.both_ready;
+      status.running = enabled.some(item => item.status.running);
+      status.recording = enabled.some(item => item.status.recording);
+      status.audio_level = Math.max(...inventory.items.map(item => item.status.audio_level || 0));
+      status.audio_device_name = 'Shared listening mix';
+    }
+    applyStatus(status);
   } catch {
     setConnection('offline', 'OFFLINE', 'Scanner status is unavailable. Retrying…');
   }
@@ -190,10 +218,13 @@ function renderSelectedCall() {
 
 async function loadCalls() {
   try {
-    const response = await fetch('/api/m2/calls?limit=40', {cache:'no-store'});
+    const requestedFeed = historyFeed;
+    const response = await fetch(feedUrl(requestedFeed, 'calls?limit=40'), {cache:'no-store'});
     if (!response.ok) throw new Error();
     const currentId = selectedCall()?.id;
-    state.calls = (await response.json()).items || [];
+    const payload = await response.json();
+    if (requestedFeed !== historyFeed) return;
+    state.calls = payload.items || [];
     if (currentId) state.selectedIndex = state.calls.findIndex(call => call.id === currentId);
     renderSelectedCall();
   } catch {
@@ -297,8 +328,12 @@ async function startLive(fromUser = true) {
     await peer.setLocalDescription(offer);
     await waitForIce(peer);
     if (generation !== state.connectionGeneration) return;
-    const response = await fetch('/api/m2/whep', {method:'POST', headers:{'Content-Type':'application/sdp'}, body:peer.localDescription.sdp, cache:'no-store'});
-    if (generation !== state.connectionGeneration) return;
+    const response = await fetch(listeningFeed === 'both' ? '/api/m2/mix/whep' : feedUrl(listeningFeed, 'whep'), {method:'POST', headers:{'Content-Type':'application/sdp'}, body:peer.localDescription.sdp, cache:'no-store'});
+    if (generation !== state.connectionGeneration) {
+      const staleSession = response.headers.get('Location');
+      if (staleSession) fetch(new URL(staleSession, location.href), {method:'DELETE', keepalive:true}).catch(() => {});
+      return;
+    }
     if (!response.ok) throw new Error(`WebRTC handshake failed (${response.status})`);
     const locationHeader = response.headers.get('Location');
     if (locationHeader) state.whepSession = new URL(locationHeader, location.href).toString();
@@ -422,20 +457,57 @@ async function nextCall() {
 }
 
 function connectEvents() {
-  state.eventSource?.close();
-  const source = new EventSource('/api/m2/events');
-  state.eventSource = source;
-  source.addEventListener('snapshot', event => { try { applyStatus(JSON.parse(event.data)); } catch {} });
-  source.addEventListener('audio-level', event => { try { renderMeter(JSON.parse(event.data).level); } catch {} });
-  source.addEventListener('now-playing', event => {
-    try { state.status = {...(state.status || {}), now_playing:JSON.parse(event.data)}; renderLcd(); } catch {}
+  state.eventSources?.forEach(source => source.close());
+  state.eventSources = ['feed1','feed2'].map(id => {
+    const source = new EventSource(feedUrl(id, 'events'));
+    source.addEventListener('snapshot', event => {
+      if (listeningFeed === id) { try { applyStatus(JSON.parse(event.data)); } catch {} }
+    });
+    source.addEventListener('audio-level', event => {
+      if (listeningFeed === id) { try { renderMeter(JSON.parse(event.data).level); } catch {} }
+    });
+    source.addEventListener('now-playing', event => {
+      if (listeningFeed === id) { try { state.status = {...(state.status || {}), now_playing:JSON.parse(event.data)}; renderLcd(); } catch {} }
+    });
+    source.addEventListener('call-completed', () => { if (historyFeed === id) loadCalls(); });
+    source.addEventListener('system', loadStatus);
+    return source;
   });
-  source.addEventListener('recording', event => {
-    try { state.status = {...(state.status || {}), recording:Boolean(JSON.parse(event.data).active)}; renderLcd(); } catch {}
-  });
-  source.addEventListener('call-completed', loadCalls);
-  source.onerror = () => setTimeout(() => { if (state.eventSource === source && source.readyState === EventSource.CLOSED) connectEvents(); }, 2000);
 }
+
+let feedSwitchGeneration = 0;
+document.querySelectorAll('[data-listen-feed]').forEach(button => button.addEventListener('click', async () => {
+  const switching = ++feedSwitchGeneration;
+  const resume = state.playIntent && !state.userPaused;
+  listeningFeed = button.dataset.listenFeed;
+  localStorage.setItem('xscan-m2-feed', listeningFeed);
+  if (listeningFeed !== 'both') {
+    historyFeed = listeningFeed;
+    localStorage.setItem('xscan-m2-history-feed', historyFeed);
+    state.calls = []; state.selectedIndex = -1;
+  }
+  audio.pause();
+  await closePeer();
+  state.connecting = false;
+  state.mode = 'live';
+  await Promise.all([loadStatus(), loadCalls()]);
+  if (switching !== feedSwitchGeneration) return;
+  if (resume) await startLive(true);
+  else { state.playIntent = false; state.userPaused = true; updateControls(); }
+}));
+$('historyFeed').addEventListener('change', async event => {
+  historyFeed = event.target.value;
+  localStorage.setItem('xscan-m2-history-feed', historyFeed);
+  if (state.mode === 'replay') {
+    pausePlayback();
+    audio.removeAttribute('src');
+    state.mode = 'live';
+    state.playIntent = false;
+  }
+  state.calls = []; state.selectedIndex = -1;
+  renderSelectedCall();
+  await loadCalls();
+});
 
 document.querySelectorAll('.tab').forEach(button => button.addEventListener('click', () => setTab(button.dataset.tab)));
 $('listenButton').addEventListener('click', togglePlayback);
@@ -502,7 +574,7 @@ setInterval(() => {
     recoverLivePlayback('Live audio stalled. Reconnecting…');
   }
 }, 4000);
-setInterval(loadStatus, 8000);
+setInterval(loadStatus, 3000);
 setInterval(loadCalls, 10_000);
 const savedVolume = Math.max(0, Math.min(100, Number(localStorage.getItem('xscan-m2-volume') ?? 90)));
 $('volume').value = String(savedVolume);

@@ -32,6 +32,7 @@ def test_audio_callback_drops_oldest_chunk_instead_of_blocking():
     class Logger:
         def warning(self, *args): pass
     engine = object.__new__(AudioEngine)
+    engine._capture_channel = "mono"
     engine._queue = queue.Queue(maxsize=1)
     engine._queue.put_nowait(b"old")
     engine.streaming, engine.state, engine.logger = Streamer(), State(), Logger()

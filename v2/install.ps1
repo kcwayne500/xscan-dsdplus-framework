@@ -19,6 +19,10 @@ $Port = if ($Cutover) { 8890 } else { 8891 }
 $EffectivePublicUrl = ''
 $Installed = $false
 
+if ((Test-Path -LiteralPath $Executable) -and (Test-Path -LiteralPath $SettingsPath)) {
+    throw 'Existing installation detected. Use scripts\upgrade-dual-feed.ps1 after stopping both feeds and quitting XScan; this preserves the installed logon launcher and creates rollback checkpoints.'
+}
+
 function Set-JsonProperty {
     param(
         [Parameter(Mandatory = $true)][object]$InputObject,

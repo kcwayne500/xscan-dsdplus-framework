@@ -9,6 +9,7 @@ export class ApiError extends Error {
 }
 
 export async function request(path, options = {}) {
+  path = feedPath(path);
   const method = (options.method || 'GET').toUpperCase();
   const headers = new Headers(options.headers || {});
   let body = options.body;
@@ -22,6 +23,15 @@ export async function request(path, options = {}) {
   const payload = contentType.includes('json') ? await response.json() : await response.text();
   if (!response.ok) throw new ApiError(payload?.detail || payload || `Request failed (${response.status})`, response.status, payload);
   return payload;
+}
+
+export function currentFeed() {
+  return localStorage.getItem('xscan-admin-feed') === 'feed2' ? 'feed2' : 'feed1';
+}
+
+export function feedPath(path) {
+  return /^\/api\/v1\/(status|system|calls|devices|settings|config|diagnostics|events|stream)(\/|\?|$)/.test(path)
+    ? path.replace('/api/v1/', `/api/v1/feeds/${currentFeed()}/`) : path;
 }
 
 export const api = {

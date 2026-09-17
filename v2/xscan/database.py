@@ -77,13 +77,13 @@ CREATE TABLE IF NOT EXISTS mobile_nonces (
   PRIMARY KEY(device_id, nonce)
 );
 CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('version', '2');
 """
 
 
 class Database:
-    def __init__(self, paths: AppPaths):
+    def __init__(self, paths: AppPaths, feed_id: str = "feed1"):
         self.paths = paths
+        self.feed_id = feed_id
         self._write_lock = threading.RLock()
         self.paths.state.mkdir(parents=True, exist_ok=True)
         self._initialise()
@@ -99,6 +99,19 @@ class Database:
     def _initialise(self) -> None:
         with self.connect() as connection:
             connection.executescript(SCHEMA)
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(calls)")}
+            if "feed_id" not in columns:
+                # SQLite's backup API includes committed WAL content. Preserve a
+                # pre-migration database before making the additive schema change.
+                if connection.execute("SELECT 1 FROM calls LIMIT 1").fetchone():
+                    folder = self.paths.backups / "schema"
+                    folder.mkdir(parents=True, exist_ok=True)
+                    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S-%f")
+                    with sqlite3.connect(folder / f"before-dual-feeds-{stamp}.db") as backup:
+                        connection.backup(backup)
+                connection.execute("ALTER TABLE calls ADD COLUMN feed_id TEXT NOT NULL DEFAULT 'feed1'")
+            connection.execute("CREATE INDEX IF NOT EXISTS idx_calls_feed_time ON calls(feed_id, started_at DESC)")
+            connection.execute("INSERT OR REPLACE INTO schema_meta(key,value) VALUES ('version','3')")
 
     @staticmethod
     def _normalise_call(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
@@ -114,8 +127,9 @@ class Database:
         now = datetime.now(UTC).isoformat()
         call_id = str(call.get("id") or secrets.token_hex(16))
         values = {
+            "feed_id": self.feed_id,
             "id": call_id,
-            "source_ref": call.get("source_ref"),
+            "source_ref": (f"{self.feed_id}:{call['source_ref']}" if self.feed_id != "feed1" and call.get("source_ref") else call.get("source_ref")),
             "started_at": call.get("started_at") or now,
             "ended_at": call.get("ended_at"),
             "duration_seconds": call.get("duration_seconds"),
@@ -159,8 +173,8 @@ class Database:
         offset: int = 0,
         limit: int = 100,
     ) -> dict[str, Any]:
-        clauses = ["state = ?"]
-        params: list[Any] = [state]
+        clauses = ["state = ?", "feed_id = ?"]
+        params: list[Any] = [state, self.feed_id]
         if search:
             clauses.append("(label LIKE ? OR frequency LIKE ? OR radio_alias LIKE ? OR radio_id LIKE ? OR note LIKE ?)")
             needle = f"%{search}%"
@@ -184,10 +198,12 @@ class Database:
 
     def get_call(self, call_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
-            row = connection.execute("SELECT * FROM calls WHERE id = ?", (call_id,)).fetchone()
+            row = connection.execute("SELECT * FROM calls WHERE id = ? AND feed_id = ?", (call_id, self.feed_id)).fetchone()
         return self._normalise_call(row) if row else None
 
     def update_call(self, call_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
+        if not self.get_call(call_id):
+            return None
         allowed = {"favorite", "tags", "note"}
         values = {key: patch[key] for key in allowed if key in patch}
         if "favorite" in values:
@@ -205,6 +221,8 @@ class Database:
         self.paths.trash.mkdir(parents=True, exist_ok=True)
         with self._write_lock, self.connect() as connection:
             for call_id in call_ids:
+                if not self.get_call(call_id):
+                    continue
                 row = connection.execute("SELECT audio_file, state FROM calls WHERE id = ?", (call_id,)).fetchone()
                 if not row or row["state"] != "active":
                     continue
@@ -229,6 +247,8 @@ class Database:
         restored = 0
         with self._write_lock, self.connect() as connection:
             for call_id in call_ids:
+                if not self.get_call(call_id):
+                    continue
                 row = connection.execute("SELECT audio_file, state FROM calls WHERE id = ?", (call_id,)).fetchone()
                 if not row or row["state"] != "trashed":
                     continue
@@ -253,6 +273,8 @@ class Database:
         purged = 0
         with self._write_lock, self.connect() as connection:
             for call_id in call_ids:
+                if not self.get_call(call_id):
+                    continue
                 row = connection.execute("SELECT audio_file, state FROM calls WHERE id = ?", (call_id,)).fetchone()
                 if not row or row["state"] != "trashed":
                     continue

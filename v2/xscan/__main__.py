@@ -8,6 +8,7 @@ import uvicorn
 from .api import create_app
 from .paths import AppPaths
 from .tray import run_tray
+from .instance import InstanceLock
 
 
 def main() -> None:
@@ -20,6 +21,11 @@ def main() -> None:
     parser.add_argument("--dsdplus-root", help="Directory containing DSDPlus.exe and FMP24.exe")
     arguments = parser.parse_args()
     paths = AppPaths.discover(state_dir=arguments.state_dir, dsdplus_root=arguments.dsdplus_root)
+    with InstanceLock(paths.state):
+        run_host(paths, arguments)
+
+
+def run_host(paths, arguments):
     app = create_app(paths, arguments.verbose)
     context = app.state.context
     server_settings = context.settings.section("server")

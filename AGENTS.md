@@ -16,6 +16,16 @@ recovery work on the installed host, read `docs/OPERATIONS.md` first.
 Run `scripts/public-release-audit.ps1` before every push. If the audit reports a
 blocked item, stop and remove the item from the index; do not weaken the audit.
 
+## Dual-feed candidate
+
+Read `docs/DUAL_FEEDS.md` before working on the two-USB-receiver feature. Feed 2
+must remain disabled until its unique SDR serial and isolated audio mapping
+are physically verified (separate cables, or verified opposite stereo channels).
+Never run a candidate against production state for a
+smoke test. Use `v2/scripts/smoke_dual_feeds.py` with its disposable state, then
+the existing-host upgrade/checkpoint procedure instead of fresh-install cleanup.
+Single-feed production and the unchanged native APK are compatibility gates.
+
 ## Supported fresh-install workflow
 
 Use an elevated 64-bit PowerShell on Windows 10/11:

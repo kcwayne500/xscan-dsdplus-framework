@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 
@@ -61,3 +61,16 @@ class AppPaths:
     def ensure(self) -> None:
         for path in (self.state, self.backups, self.logs, self.recordings, self.trash):
             path.mkdir(parents=True, exist_ok=True)
+
+    def for_feed(self, feed_id: str) -> "AppPaths":
+        if feed_id == "feed1":
+            return self
+        if feed_id != "feed2":
+            raise ValueError("Unknown feed")
+        state = self.state / "feeds" / feed_id
+        dsdplus = state / "dsdplus"
+        recordings = dsdplus / "recordings"
+        return replace(self, state=state, dsdplus=dsdplus, recordings=recordings,
+                       backups=state / "backups", logs=state / "logs",
+                       trash=recordings / ".xscan-trash", settings=state / "settings.json",
+                       migration=state / "migration.json")

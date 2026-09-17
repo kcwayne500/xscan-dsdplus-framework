@@ -14,7 +14,12 @@ from .paths import AppPaths
 
 
 DEFAULT_SETTINGS: dict[str, Any] = {
-    "schema_version": 2,
+    "schema_version": 3,
+    "feeds": {
+        "feed1": {"name": "Feed 1", "enabled": True},
+        "feed2": {"name": "Feed 2", "enabled": False},
+    },
+    "mix": {"feed1": 1.0, "feed2": 1.0},
     "server": {
         # The public reverse proxy is the only network-facing listener. Keep
         # the application backend on loopback so port 8890 cannot bypass TLS.
@@ -46,6 +51,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "minimum_seconds": 0.5,
         "pre_roll_seconds": 0.5,
         "channels": 1,
+        # Recordings/publishers remain mono. L/R modes capture stereo and select
+        # exactly one channel before metering, segmentation or publication.
+        "capture_channel": "mono",
         "dtype": "int16",
         "blocksize": 2048,
         "per_channel": {},
@@ -188,6 +196,15 @@ class SettingsStore:
 
     @staticmethod
     def _validate(data: dict[str, Any]) -> None:
+        for feed_id in ("feed1", "feed2"):
+            feed = data.get("feeds", DEFAULT_SETTINGS["feeds"])[feed_id]
+            if not isinstance(feed.get("enabled"), bool) or not str(feed.get("name", "")).strip():
+                raise ValueError("Each feed requires a name and enabled flag")
+            if len(str(feed["name"])) > 60:
+                raise ValueError("Feed name must be at most 60 characters")
+            weight = float(data.get("mix", DEFAULT_SETTINGS["mix"])[feed_id])
+            if not 0 <= weight <= 1:
+                raise ValueError("Mix weights must be between 0 and 1")
         port = int(data["server"]["port"])
         if not 1 <= port <= 65535:
             raise ValueError("server.port must be between 1 and 65535")
@@ -205,7 +222,21 @@ class SettingsStore:
                 raise ValueError(f"audio.{key} cannot be negative")
         if int(audio["channels"]) != 1:
             raise ValueError("XScan V2 currently supports one audio channel")
+        channel = audio.get("capture_channel", "mono")
+        if channel not in ("mono", "left", "right"):
+            raise ValueError("audio.capture_channel must be mono, left or right")
+        if channel != "mono":
+            import re
+            if str(audio.get("device_host_api", "")).casefold() != "windows wasapi":
+                raise ValueError("Split stereo capture requires Windows WASAPI shared mode")
+            outputs = [str(arg) for arg in data["runtime"]["dsdplus_args"] if str(arg).startswith("-o")]
+            suffix = "L" if channel == "left" else "R"
+            if len(outputs) != 1 or not re.fullmatch(r"-o([1-9]\d{0,2})" + suffix, outputs[0]) or int(outputs[0][2:-1]) > 255:
+                raise ValueError("DSDPlus output channel must match the selected capture channel")
         streaming = data["streaming"]
+        import re
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", str(streaming["stream_name"])):
+            raise ValueError("streaming.stream_name must contain only letters, numbers, underscores or hyphens")
         for key in ("rtsp_port", "webrtc_port", "webrtc_media_port", "hls_port"):
             if not 1 <= int(streaming[key]) <= 65535:
                 raise ValueError(f"streaming.{key} must be between 1 and 65535")
